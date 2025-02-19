@@ -16,6 +16,8 @@ CI powinno spełniać wymagania:
 - Uruchomić aplikację z obrazu kontenera
 - Sprawdzić czy kontener działa poprawnie z wykorzystaniem klucza API
 
+Wszystko o GitHub Actions w [dokumentacji](https://docs.github.com/en/actions).
+
 ## Krok 0 - Fork repozytorium
 
 Wykonaj fork tego repozytorium (przycisk "Fork" w prawym górnym rogu).
@@ -52,10 +54,23 @@ sed -i 's/your_openweathermap_api_key/<twój klucz>/' .env
 
 ## Krok 2 - Tworzenie workflow CI
 
-Po każdym kroku rób commit i push do repozytorium.
-Następnie przejdź do "Actions" i sprawdź czy uruchamiaj workflow.
+Utwórz nowy branch:
 
-Utwórz plik `.github/workflows/ci.yml` i postępuj zgodnie z poniższymi krokami:
+```bash
+git checkout -b ci-workflow
+```
+
+Utwórz plik `.github/workflows/ci.yml` i postępuj zgodnie z poniższymi krokami.
+
+Po każdym kroku rób commit i push do repozytorium.
+
+```bash
+git add .
+git commit -m "Dodaj workflow CI"
+git push
+```
+
+Następnie przejdź do "Actions" i sprawdź 
 
 ### 2.1 Dodaj metodę uruchomienia workflow
 
@@ -65,13 +80,13 @@ Utwórz plik `.github/workflows/ci.yml` i postępuj zgodnie z poniższymi krokam
 name: CI weather app
 
 on:
-  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 ```
 
+Stwórz pull request i sprawdź czy workflow uruchamia się po pushu do brancha.
 
 ### 2.2 Dodaj job budowania
 
@@ -140,7 +155,7 @@ Wykorzystujemy `needs` aby wymusić uruchomienie joba `build` przed jobem `docke
 
 Dodaj klucz do GitHub Secrets jako `WEATHER_API_KEY`.
 
-1. Actions > Secrets and variables > Actions > New repository secret
+1. Settings > Secrets and variables > Actions > New repository secret
 2. Name: WEATHER_API_KEY
 3. Value: <twój klucz>
 4. Save
@@ -195,19 +210,31 @@ Niektóre zdarzenia mogą być wywołane w zależności od wyniku innych jobów.
 ```
 [Dokumentacja conditional steps](https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution)
 
-## Krok 3 - Testowanie workflow
+## Krok 2.6 Dodaj cache actions
 
-1. Zatwierdź i wypchnij zmiany
+Dodaj cache do joba `build` aby przyspieszyć budowanie aplikacji.
 
-```bash
-git add .
-git commit -m "Dodaj workflow CI"
-git push
-```
+> NIE URUCHAMIAĆ (jeszcze nie działa).
 
-1. Utwórz Pull Request do brancha main
-2. Sprawdź zakładkę Actions w GitHub, aby zobaczyć działający workflow
-3. Zweryfikuj czy wszystkie joby zakończyły się sukcesem
+```yaml
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+``` 
+
+## Krok 3 - Ustawienie polityki dla brancha main
+
+Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
+
+- Branch name: `main`
+- Require a pull request before merging
+- Require status checks to pass before merging -> znajdź joba po nazwie i dodaj "Build and Test" oraz "Docker Build and Test"
+- Require branches to be up to date before merging
+- Require pull request reviews before merging
 
 ## Krok 4 - Weryfikacja wymagań
 
