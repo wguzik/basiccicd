@@ -224,15 +224,36 @@ Niektóre zdarzenia mogą być wywołane w zależności od wyniku innych jobów.
 ```
 [Dokumentacja conditional steps](https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution)
 
-## Krok 2.7
+## Krok 2.7 Dodaj SBOM
 
+Dodaj job `SBOM` do workflow.
 
+```
+  SBOM:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom.json
+      
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 1
+```
 
- Dodaj cache actions
-
-Dodaj cache do joba `build` aby przyspieszyć budowanie aplikacji.
+## Krok 2.x Dodaj cache actions
 
 > NIE URUCHAMIAĆ (jeszcze nie działa).
+
+Dodaj cache do joba `build` aby przyspieszyć budowanie aplikacji.
 
 ```yaml
       - name: Cache dependencies
