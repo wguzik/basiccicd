@@ -258,6 +258,8 @@ Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
 
 Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
 
+Dodaj zmianę i wypushuj kod. Zauważ, że oprócz PR checka odpala się CodeQL.
+
 ## Krok 4 - Weryfikacja wymagań
 
 Upewnij się, że Twój workflow:

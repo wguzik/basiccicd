@@ -144,6 +144,7 @@ Przejdź do "Security" > "Code scanning" i zobacz wyniki.
 
 ## Krok 4 - Wymuszenie polityk na branchu
 
+
 Dodaj policy, które wymusza przejście workflow na zielono przed mergem.
 
 ## Weryfikacja
