@@ -254,6 +254,10 @@ Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
 - Require branches to be up to date before merging
 - Require pull request reviews before merging
 
+## Krok 4 - Dodaj SAST z CodeQL
+
+Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
+
 ## Krok 4 - Weryfikacja wymagań
 
 Upewnij się, że Twój workflow:
