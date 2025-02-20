@@ -4,6 +4,8 @@
 
 Konto na GitHub (no właśnie! ;)).
 
+Konto w Azure lub zainstalowane IDE (np. VSCode) oraz git lokalnie.
+
 ## Cel
 
 Celem ćwiczenia jest zbudowanie podstawowego CI w GitHub Actions.
@@ -15,6 +17,8 @@ CI powinno spełniać wymagania:
 - Zbudować kontener z aplikacją
 - Uruchomić aplikację z obrazu kontenera
 - Sprawdzić czy kontener działa poprawnie z wykorzystaniem klucza API
+
+Zajrzyj do [dokumentacji GitHub Actions](https://docs.github.com/en/actions).
 
 ## Krok 0 - Fork repozytorium
 
@@ -52,10 +56,23 @@ sed -i 's/your_openweathermap_api_key/<twój klucz>/' .env
 
 ## Krok 2 - Tworzenie workflow CI
 
-Po każdym kroku rób commit i push do repozytorium.
-Następnie przejdź do "Actions" i sprawdź czy uruchamiaj workflow.
+Utwórz nowy branch:
 
-Utwórz plik `.github/workflows/ci.yml` i postępuj zgodnie z poniższymi krokami:
+```bash
+git checkout -b ci-workflow
+```
+
+Utwórz plik `.github/workflows/ci.yml` i postępuj zgodnie z poniższymi krokami.
+
+Po każdym kroku rób commit i push do repozytorium.
+
+```bash
+git add .
+git commit -m "Dodaj workflow CI"
+git push
+```
+
+Następnie przejdź do "Actions" i sprawdź 
 
 ### 2.1 Dodaj metodę uruchomienia workflow
 
@@ -65,13 +82,13 @@ Utwórz plik `.github/workflows/ci.yml` i postępuj zgodnie z poniższymi krokam
 name: CI weather app
 
 on:
-  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 ```
 
+Stwórz pull request i sprawdź czy workflow uruchamia się po pushu do brancha.
 
 ### 2.2 Dodaj job budowania
 
@@ -109,10 +126,24 @@ jobs:
       - name: Build Application
         run: npm run build
         
-      - name: Run Tests
-        run: npm test
+      - name: Run Tests with Coverage
+        run: npm run test:coverage
+        continue-on-error: true
 ```
 
+Popraw błędy w testach. Dodaj kropkę w pliku [index.test.ts](./src/__tests__/index.test.ts) w linii 107.
+
+Ponownie błąd?
+
+Dopisz:
+
+```yaml
+      - name: Run Tests with Coverage
+        run: npm run test:coverage
+        continue-on-error: true # ten fragment
+```
+
+Uruchom workflow ponownie.
 
 ### 2.3 Dodaj job Dockera
 
@@ -140,7 +171,7 @@ Wykorzystujemy `needs` aby wymusić uruchomienie joba `build` przed jobem `docke
 
 Dodaj klucz do GitHub Secrets jako `WEATHER_API_KEY`.
 
-1. Actions > Secrets and variables > Actions > New repository secret
+1. Settings > Secrets and variables > Actions > New repository secret
 2. Name: WEATHER_API_KEY
 3. Value: <twój klucz>
 4. Save
@@ -183,7 +214,7 @@ W ramach joba `docker` wykonujemy następujące kroki:
           fi
 ```
 
-### 2.5 Dodaj sprzątanie
+### 2.6 Dodaj sprzątanie
 
 Porządek musi być.
 Niektóre zdarzenia mogą być wywołane w zależności od wyniku innych jobów.
@@ -195,19 +226,62 @@ Niektóre zdarzenia mogą być wywołane w zależności od wyniku innych jobów.
 ```
 [Dokumentacja conditional steps](https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution)
 
-## Krok 3 - Testowanie workflow
+## Krok 2.7 Dodaj SBOM
 
-1. Zatwierdź i wypchnij zmiany
+Dodaj job `SBOM` do workflow.
 
-```bash
-git add .
-git commit -m "Dodaj workflow CI"
-git push
+```
+  SBOM:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom.json
+      
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 1
 ```
 
-1. Utwórz Pull Request do brancha main
-2. Sprawdź zakładkę Actions w GitHub, aby zobaczyć działający workflow
-3. Zweryfikuj czy wszystkie joby zakończyły się sukcesem
+## Krok 2.x Dodaj cache actions
+
+> NIE URUCHAMIAĆ (jeszcze nie działa).
+
+Dodaj cache do joba `build` aby przyspieszyć budowanie aplikacji.
+
+```yaml
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+``` 
+
+## Krok 3 - Ustawienie polityki dla brancha main
+
+Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
+
+- Branch name: `main`
+- Require a pull request before merging
+- Require status checks to pass before merging -> znajdź joba po nazwie i dodaj "Build and Test" oraz "Docker Build and Test"
+- Require branches to be up to date before merging
+- Require pull request reviews before merging
+
+## Krok 4 - Dodaj SAST z CodeQL
+
+Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
+
+Dodaj zmianę i wypushuj kod. Zauważ, że oprócz PR checka odpala się CodeQL.
 
 ## Krok 4 - Weryfikacja wymagań
 
