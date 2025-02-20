@@ -128,8 +128,32 @@ jobs:
         run: npm test
 ```
 
+### 2.3 Dopisz Code test coverage
 
-### 2.3 Dodaj job Dockera
+Wejdź na [https://coveralls.io/](https://codecov.io/) i zaloguj się przy użyciu swojego GitHuba, potwierdź swoją tożsamość.
+
+Przejdź do ustawień konta i wygeneruj token.
+
+Dodaj klucz do GitHub Secrets jako `CODECOV_TOKEN`.
+
+1. Settings > Secrets and variables > Actions > New repository secret
+2. Name: CODECOV_TOKEN
+3. Value: <twój token>
+4. Save
+
+Do joba `build` dopisz:
+
+```yaml
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
+          verbose: true
+```
+
+### 2.4 Dodaj job Dockera
 
 W ramach joba `docker` wykonujemy następujące kroki:
 
@@ -151,7 +175,7 @@ Wykorzystujemy `needs` aby wymusić uruchomienie joba `build` przed jobem `docke
         run: docker build -t weather-app .
 ```
 
-### 2.4 Dodaj klucz do GitHub Secrets 
+### 2.5 Dodaj klucz do GitHub Secrets 
 
 Dodaj klucz do GitHub Secrets jako `WEATHER_API_KEY`.
 
@@ -164,7 +188,7 @@ W kolejnym etapie w ramach joba `docker` wykorzystamy ten klucz, po to aby aplik
 
 [Dokumentacja GitHub Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
 
-### 2.5 Dodaj testy kontenera
+### 2.6 Dodaj testy kontenera
 
 W ramach joba `docker` wykonujemy następujące kroki:
 
@@ -198,7 +222,7 @@ W ramach joba `docker` wykonujemy następujące kroki:
           fi
 ```
 
-### 2.5 Dodaj sprzątanie
+### 2.7 Dodaj sprzątanie
 
 Porządek musi być.
 Niektóre zdarzenia mogą być wywołane w zależności od wyniku innych jobów.
@@ -210,7 +234,7 @@ Niektóre zdarzenia mogą być wywołane w zależności od wyniku innych jobów.
 ```
 [Dokumentacja conditional steps](https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution)
 
-## Krok 2.6 Dodaj cache actions
+## Krok 2.8 Dodaj cache actions
 
 Dodaj cache do joba `build` aby przyspieszyć budowanie aplikacji.
 
