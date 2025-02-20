@@ -13,19 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          format: spdx-json
-          output-file: sbom.json
-      
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.json
-          retention-days: 1
-      
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -80,7 +67,7 @@ jobs:
         run: docker rm -f weather-app-container 
 
   SBOM:
-    name: Build and Test
+    name: Generate SBOM
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
