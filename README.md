@@ -4,6 +4,8 @@
 
 Konto na GitHub (no właśnie! ;)).
 
+Konto w Azure lub zainstalowane IDE (np. VSCode) oraz git lokalnie.
+
 ## Cel
 
 Celem ćwiczenia jest zbudowanie podstawowego CI w GitHub Actions.
@@ -16,7 +18,7 @@ CI powinno spełniać wymagania:
 - Uruchomić aplikację z obrazu kontenera
 - Sprawdzić czy kontener działa poprawnie z wykorzystaniem klucza API
 
-Wszystko o GitHub Actions w [dokumentacji](https://docs.github.com/en/actions).
+Zajrzyj do [dokumentacji GitHub Actions](https://docs.github.com/en/actions).
 
 ## Krok 0 - Fork repozytorium
 
