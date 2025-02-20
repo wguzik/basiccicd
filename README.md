@@ -128,6 +128,8 @@ jobs:
         run: npm test
 ```
 
+Popraw błędy w testach. Dodaj kropkę w pliku [index.test.ts](./src/__tests__/index.test.ts) w linii 107.
+
 ### 2.3 Dopisz Code test coverage
 
 Wejdź na [https://coveralls.io/](https://codecov.io/) i zaloguj się przy użyciu swojego GitHuba, potwierdź swoją tożsamość.
