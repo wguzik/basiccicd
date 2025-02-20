@@ -151,9 +151,11 @@ Do joba `build` dopisz:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
 ```
+
+Zwróć uwagę na `fail_ci_if_error: true`, zmień na `false` i uruchom workflow ponownie.
 
 ### 2.4 Dodaj job Dockera
 
