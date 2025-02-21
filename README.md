@@ -39,7 +39,7 @@ Jeżeli chcesz, możesz uruchomić aplikację lokalnie:
 npm install
 npm start
 ```
-
++
 Otwórz przeglądarkę i przejdź do strony http://localhost:3000.
 
 ## Krok 1 - Przygotowanie klucza API
@@ -51,6 +51,7 @@ Jeżeli chcesz uruchamiać aplikację lokalnie, zrób jeszcze:
 
 3. Utwórz plik .env i wklej swój klucz
 ```bash
+cp .env.example .env
 sed -i 's/your_openweathermap_api_key/<twój klucz>/' .env
 ```
 
@@ -69,6 +70,13 @@ Po każdym kroku rób commit i push do repozytorium.
 ```bash
 git add .
 git commit -m "Dodaj workflow CI"
+git push
+```
+
+Później wystarczy:
+
+```bash
+git commit -am "Dodaj workflow CI"
 git push
 ```
 
@@ -128,7 +136,6 @@ jobs:
         
       - name: Run Tests with Coverage
         run: npm run test:coverage
-        continue-on-error: true
 ```
 
 Popraw błędy w testach. Dodaj kropkę w pliku [index.test.ts](./src/__tests__/index.test.ts) w linii 107.
@@ -205,9 +212,11 @@ W ramach joba `docker` wykonujemy następujące kroki:
         run: |
           # Test endpointu głównego
           curl -f http://localhost:3000/ || exit 1
-          
+
+      - name: Test endpoint with secret
+        run: |
           # Test endpointu pogody dla Zakopanego
-          response=$(curl -f http://localhost:3000/weather/Zakopane)
+          response=$(curl http://localhost:3000/weather/Zakopane)
           if [[ $response == *"tired"* ]]; then
             echo "Aplikacja jest zmęczona, szefie."
             exit 1
@@ -230,7 +239,7 @@ Niektóre zdarzenia mogą być wywołane w zależności od wyniku innych jobów.
 
 Dodaj job `SBOM` do workflow.
 
-```
+```yaml
   SBOM:
     name: Build and Test
     runs-on: ubuntu-latest
