@@ -48,4 +48,4 @@ fi
 echo "🧹 Cleaning up..."
 docker rm -f weather-app-container
 
-echo "✅ All tests completed successfully!" 
+echo "✅ All tests completed successfully!"
