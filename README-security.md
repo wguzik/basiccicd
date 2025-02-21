@@ -88,7 +88,7 @@ Wymuś błąd jeśli zostanie znaleziony obraz z podatnościami, zobacz w dokume
           exit-code: 1 
 ```
 
-## Krok 2 - Konfiguracja Dependabot
+## Krok 2 - Konfiguracja Security/Quality Scans
 
 ### 2.1 Dodaj plik konfiguracyjny
 
@@ -125,7 +125,7 @@ updates:
 > - Tworzył PR-y z aktualizacjami bezpieczeństwa
 > - Monitorował npm, Docker i GitHub Actions
 
-## Code QL
+## 2.3 Włącz CodeQL
 
 Włącz CodeQL w repozytorium:
 
@@ -144,7 +144,6 @@ Przejdź do "Security" > "Code scanning" i zobacz wyniki.
 
 ## Krok 4 - Wymuszenie polityk na branchu
 
-
 Dodaj policy, które wymusza przejście workflow na zielono przed mergem.
 
 ## Weryfikacja
@@ -154,5 +153,6 @@ Upewnij się, że:
 - [x] Dependabot wykrywa podatności
 - [x] NPM Audit sprawdza zależności Node.js
 - [x] Trivy skanuje obraz Docker
+- [x] CodeQL analizuje kod
 
 > Więcej o bezpieczeństwie w GitHub Actions w [dokumentacji](https://docs.github.com/en/code-security).
