@@ -290,6 +290,36 @@ Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
 
 Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
 
+## Krok 2.x Dodaj cache actions
+
+> NIE URUCHAMIAĆ (jeszcze nie działa).
+
+Dodaj cache do joba `build` aby przyspieszyć budowanie aplikacji.
+
+```yaml
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+``` 
+
+## Krok 3 - Ustawienie polityki dla brancha main
+
+Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
+
+- Branch name: `main`
+- Require a pull request before merging
+- Require status checks to pass before merging -> znajdź joba po nazwie i dodaj "Build and Test" oraz "Docker Build and Test"
+- Require branches to be up to date before merging
+- Require pull request reviews before merging
+
+## Krok 4 - Dodaj SAST z CodeQL
+
+Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
+
 Dodaj zmianę i wypushuj kod. Zauważ, że oprócz PR checka odpala się CodeQL.
 
 ## Krok 4 - Weryfikacja wymagań
