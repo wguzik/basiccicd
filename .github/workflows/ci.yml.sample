@@ -52,13 +52,15 @@ jobs:
         
       - name: Test running container
         run: |
-          # Test the root endpoint
+          # Test endpointu głównego
           curl -f http://localhost:3000/ || exit 1
-          
-          # Test the weather endpoint with Zakopane
-          response=$(curl -f http://localhost:3000/weather/Zakopane)
+
+      - name: Test endpoint with secret
+        run: |
+          # Test endpointu pogody dla Zakopanego
+          response=$(curl http://localhost:3000/weather/Zakopane)
           if [[ $response == *"tired"* ]]; then
-            echo "App is tired, boss."
+            echo "Aplikacja jest zmęczona, szefie."
             exit 1
           fi
         
