@@ -29,8 +29,8 @@ Wykonaj fork tego repozytorium (przycisk "Fork" w prawym górnym rogu).
 Sklonuj repozytorium na swój komputer lub cloud shell.
 
 ```bash
-git clone https://github.com/your-username/weather-app
-cd weather-app
+git clone https://github.com/your-username/basiccicd
+cd basiccicd
 ```
 
 Jeżeli chcesz, możesz uruchomić aplikację lokalnie:
@@ -39,7 +39,7 @@ Jeżeli chcesz, możesz uruchomić aplikację lokalnie:
 npm install
 npm start
 ```
-+
+
 Otwórz przeglądarkę i przejdź do strony http://localhost:3000.
 
 ## Krok 1 - Przygotowanie klucza API
@@ -286,27 +286,7 @@ Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
 - Require branches to be up to date before merging
 - Require pull request reviews before merging
 
-## Krok 4 - Dodaj SAST z CodeQL
-
-Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
-
-## Krok 2.x Dodaj cache actions
-
-> NIE URUCHAMIAĆ (jeszcze nie działa).
-
-Dodaj cache do joba `build` aby przyspieszyć budowanie aplikacji.
-
-```yaml
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-``` 
-
-## Krok 3 - Ustawienie polityki dla brancha main
+## Krok 4 - Ustawienie polityki dla brancha main
 
 Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
 
@@ -316,13 +296,13 @@ Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
 - Require branches to be up to date before merging
 - Require pull request reviews before merging
 
-## Krok 4 - Dodaj SAST z CodeQL
+## Krok 5 - Dodaj SAST z CodeQL
 
 Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
 
 Dodaj zmianę i wypushuj kod. Zauważ, że oprócz PR checka odpala się CodeQL.
 
-## Krok 4 - Weryfikacja wymagań
+## Krok 6 - Weryfikacja wymagań
 
 Upewnij się, że Twój workflow:
 - [x] Uruchamia się przy PR do main
