@@ -47,9 +47,10 @@ Otwórz przeglądarkę i przejdź do strony http://localhost:3000.
 1. Utwórz konto na [OpenWeatherMap](https://home.openweathermap.org/)
 2. Pobierz klucz API z [API Keys](https://home.openweathermap.org/api_keys)
 
-Jeżeli chcesz uruchamiać aplikację lokalnie, zrób jeszcze:
+Jeżeli chcesz uruchamiać aplikację lokalnie, zrób jeszcze (tylko mac/linux):
 
 3. Utwórz plik .env i wklej swój klucz
+> Nie wklejaj klucza do pliku `.env.example`!
 ```bash
 cp .env.example .env
 sed -i 's/your_openweathermap_api_key/<twój klucz>/' .env
