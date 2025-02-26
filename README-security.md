@@ -47,6 +47,8 @@ jobs:
           head-ref: ${{ github.event.pull_request.head.sha }}
 ```
 
+Nawiguj do "Settings" (zakładka) > "Code security" (po lewej) > "Dependency graph" ustaw na `Enabled`.
+
 ### 1.4 Dodaj skanowanie NPM
 
 Skanowanie NPM to narzędzie, które sprawdza zależności pod kątem podatności.
