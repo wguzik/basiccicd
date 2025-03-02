@@ -4,7 +4,7 @@ on:
     push:
         branches: [main]
     pull_request:
-        branches: [dev]
+        branches: [main]
         
 jobs:
     build:
@@ -28,3 +28,38 @@ jobs:
             - name: Run Tests with Coverage
               run: npm run test:coverage
               continue-on-error: true
+
+    docker:
+     name: Docker Build and Test
+     needs: build
+     runs-on: ubuntu-latest
+     steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Docker image
+        run: docker build -t weather-app .
+        
+      - name: Run Docker container
+        run: |
+          docker run -d \
+            -p 3000:3000 \
+            -e WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }} \
+            --name weather-app-container \
+            weather-app
+          
+          # Wait for container to start
+          sleep 5
+          
+      - name: Test running container
+        run: |
+          # Test endpointu głównego
+          curl -f http://localhost:3000/ || exit 1
+
+      - name: Test endpoint with secret
+        run: |
+          # Test endpointu pogody dla Zakopanego
+          response=$(curl http://localhost:3000/weather/Zakopane)
+          if [[ $response == *"tired"* ]]; then
+            echo "Aplikacja jest zmęczona, szefie."
+            exit 1
+          fi
