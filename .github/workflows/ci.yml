@@ -53,7 +53,7 @@ jobs:
             - name: Test running container
               run:
                 #Test endpointu głównego
-                curl -f http://localhost:3000 | exit 1
+                curl -f http://localhost:3000 || exit 1
                 
             - name: Test endpoint with secret
               run:
