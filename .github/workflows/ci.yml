@@ -1,10 +1,10 @@
-name: CI whatever app
+name: CI weather app
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 jobs:
     build:
@@ -28,5 +28,44 @@ jobs:
             - name: run Tests with coverage
               run: npm run test:coverage
               continue-on-error: true
+    
+    docker:
+        name: Docker Build and Push
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: build docker image
+              run: docker build -t wheather -app .
+
+            - name: Run docker container
+              run: 
+                docker run -d \
+                    -p 3000:3000 \
+                    -e WEATHER_API_KEY = ${{ secrets.WHEATHER_API_KEY }} \
+                    -- name weather-app-container \
+                    weather-app
+
+                # Poczekaj na uruchomienie kontenera
+                sleep = 5
+            
+            - name: Test running container
+              run:
+                #Test endpointu głównego
+                curl -f http://localhost:3000 | exit 1
+                
+            - name: Test endpoint with secret
+              run:
+                #Tesst endpointu pogody dla Zakopanego
+                response = $(curl -s http://localhost:3000/weather/Zakopane)
+                if [[ $response != *"tired"* ]]; then
+                    echo "Aplikacja jest zmęczona, szefie."
+                    exit 1
+                fi
+
+
+    
+
   
 
