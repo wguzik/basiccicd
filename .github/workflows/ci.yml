@@ -30,7 +30,7 @@ jobs:
               continue-on-error: true
     
     docker:
-        name: Docker Build and Push
+        name: Docker Build and Test
         needs: build
         runs-on: ubuntu-latest
         steps:
@@ -51,7 +51,7 @@ jobs:
                 sleep: 5
             
             - name: Test running container
-              run:
+              run: |
                 #Test endpointu głównego
                 curl -f http://localhost:3000 || exit 1
                 
