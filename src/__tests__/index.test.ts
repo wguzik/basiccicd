@@ -93,7 +93,7 @@ describe('Weather App Frontend', () => {
       ok: false,
       json: async () => ({
         error: 'I am tired, boss.',
-        details: 'city not found'
+        details: 'City not found!'
       })
     });
 
