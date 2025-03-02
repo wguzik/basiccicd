@@ -63,3 +63,6 @@ jobs:
             echo "Aplikacja jest zmęczona, szefie."
             exit 1
           fi
+      - name: Cleanup
+        if: always()
+        run: docker rm -f weather-app-container
