@@ -64,6 +64,10 @@ jobs:
             exit 1
           fi
 
+      - name: Cleanup
+        if: always()
+        run: docker rm -f weather-app-container
+
 
     
 
