@@ -1,12 +1,12 @@
-name: CI
+name: CI weather app
 
 on:
   push:
     branches:
-      - ci-workflow
+      - DEV
   pull_request:
     branches:
-      - main
+      - DEV
 
 jobs:
   build:
