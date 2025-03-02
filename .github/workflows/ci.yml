@@ -1,4 +1,4 @@
-name: CI whatever app
+name: CI weather app
 
 on:
   push:
@@ -28,6 +28,10 @@ jobs:
             - name: run Tests with coverage
               run: npm run test:coverage
               continue-on-error: true
+<<<<<<< HEAD
+=======
+    
+>>>>>>> ci-workflow
     docker:
         name: Docker Build and Push
         needs: build
@@ -52,7 +56,11 @@ jobs:
             - name: Test running container
               run:
                 #Test endpointu głównego
+<<<<<<< HEAD
                 curl -f http://localhost:3000 || exit 1
+=======
+                curl -f http://localhost:3000 | exit 1
+>>>>>>> ci-workflow
                 
             - name: Test endpoint with secret
               run:
@@ -62,4 +70,12 @@ jobs:
                     echo "Aplikacja jest zmęczona, szefie."
                     exit 1
                 fi
+<<<<<<< HEAD
+=======
+
+
+    
+
+  
+>>>>>>> ci-workflow
 
