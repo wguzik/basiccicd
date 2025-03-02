@@ -43,7 +43,7 @@ jobs:
               run: |
                 docker run -d \
                     -p 3000:3000 \
-                    -e WEATHER_API_KEY = ${{ secrets.WHEATHER_API_KEY }} \
+                    -e WEATHER_API_KEY = ${{ secrets.WEATHER_API_KEY }} \
                     -- name weather-app-container \
                     weather-app
 
