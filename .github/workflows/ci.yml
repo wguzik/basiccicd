@@ -40,7 +40,7 @@ jobs:
               run: docker build -t wheather -app .
 
             - name: Run docker container
-              run: 
+              run: |
                 docker run -d \
                     -p 3000:3000 \
                     -e WEATHER_API_KEY = ${{ secrets.WHEATHER_API_KEY }} \
@@ -48,7 +48,7 @@ jobs:
                     weather-app
 
                 # Poczekaj na uruchomienie kontenera
-                sleep = 5
+                sleep: 5
             
             - name: Test running container
               run:
@@ -57,7 +57,7 @@ jobs:
                 
             - name: Test endpoint with secret
               run:
-                #Tesst endpointu pogody dla Zakopanego
+                #Test endpointu pogody dla Zakopanego
                 response = $(curl -s http://localhost:3000/weather/Zakopane)
                 if [[ $response != *"tired"* ]]; then
                     echo "Aplikacja jest zmęczona, szefie."
