@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]      
   pull_request:
-    branches: [main]
+    branches: [dev]
 
 jobs:
  build:
@@ -29,4 +29,3 @@ jobs:
         run: npm run test:coverage
         continue-on-error: true
 
-        
