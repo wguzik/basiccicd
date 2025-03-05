@@ -21,7 +21,7 @@ describe('Weather App Frontend', () => {
         errorInfo.innerHTML = `<p>${message}</p>`;
       }
     };
-
+    //function to get weather data
     window.getWeather = async () => {
       const cityInput = document.getElementById('cityInput') as HTMLInputElement;
       const weatherInfo = document.getElementById('weatherInfo');
