@@ -287,23 +287,13 @@ Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
 - Require branches to be up to date before merging
 - Require pull request reviews before merging
 
-## Krok 4 - Ustawienie polityki dla brancha main
-
-Wejdź do "Settings" > "Branches" > "Add classic branch protection rule"
-
-- Branch name: `main`
-- Require a pull request before merging
-- Require status checks to pass before merging -> znajdź joba po nazwie i dodaj "Build and Test" oraz "Docker Build and Test"
-- Require branches to be up to date before merging
-- Require pull request reviews before merging
-
-## Krok 5 - Dodaj SAST z CodeQL
+## Krok 4 - Dodaj SAST z CodeQL
 
 Otwórz "Security" > "Code scanning alerts" i włącz CodeQL.
 
 Dodaj zmianę i wypushuj kod. Zauważ, że oprócz PR checka odpala się CodeQL.
 
-## Krok 6 - Weryfikacja wymagań
+## Krok 5 - Weryfikacja wymagań
 
 Upewnij się, że Twój workflow:
 - [x] Uruchamia się przy PR do main
