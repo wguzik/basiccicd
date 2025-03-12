@@ -71,7 +71,7 @@ terraform init
 terraform plan
 ```
 
-## Krok 4 - Wdrożenie infrastruktury
+## Krok 3 - Wdrożenie infrastruktury
 
 - Wdróż infrastrukturę:
 
@@ -90,7 +90,7 @@ az aks get-credentials --name myproject-dev-aks --resource-group myproject-dev-r
 - uruchom `managed nginx`
 
 ```
-# ten krok można wykonać za pomocą terraforma, ale celowo jest tu ręcznie
+# ten krok można wykonać za pomocą terraforma, ale celowo ustawiasz to ręcznie
 
 az aks approuting enable --resource-group <ResourceGroupName> --name <ClusterName>
 ```
