@@ -1,4 +1,4 @@
-name: Container image build and push
+name: CD Artifact - weather-app
 
 on:
   push:
