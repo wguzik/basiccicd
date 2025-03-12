@@ -158,10 +158,9 @@ git commit -m "Add Docker workflow"
 git push
 ```
 
-2. Stwórz pull request i go zmerge'uj.
-
-1. Przejdź do zakładki GitHub Actions, aby monitorować workflow
-2. Po pomyślnym zakończeniu, sprawdź swoje repozytorium Docker Hub w poszukiwaniu nowego obrazu
+1. Stwórz pull request i go zmerge'uj.
+2. Przejdź do zakładki GitHub Actions, aby monitorować uruchomienie workflow 
+3. Po pomyślnym zakończeniu, sprawdź swoje repozytorium Docker Hub w poszukiwaniu nowego obrazu
 
 ## Krok 6 - Weryfikacja Wymagań
 
@@ -171,13 +170,13 @@ Upewnij się, że Twój workflow:
 - [x] Taguje obraz hashem commita i datą
 - [x] Przesyła obraz do Docker Hub
 
-Twój potok jest teraz gotowy do automatycznego budowania i publikowania obrazów Docker!
+Twój pipeline jest teraz gotowy do automatycznego budowania i publikowania obrazów Docker!
 
-## Struktura Workflow
+## Struktura Workflow 
 
 ```mermaid
 graph TD
-    A[Workflow: Docker Build and Push]
+    A[Workflow: CD Artifact - weather-app]
     B[Job: docker]
     
     B --> C[Step: Checkout]
@@ -201,11 +200,5 @@ graph TD
     style I fill:#0969da,stroke:#0969da,color:#ffffff
     style J fill:#0969da,stroke:#0969da,color:#ffffff
 ```
-
-Diagram pokazuje:
-- Workflow zawiera jeden job: `docker`
-- Każdy krok wykorzystuje specyficzne GitHub Actions
-- Przepływ od pobrania kodu do przesłania obrazu
-- Integrację z Docker Hub poprzez sekrety
 
 > Więcej szczegółów na temat struktury workflow GitHub Actions znajdziesz w [oficjalnej dokumentacji](https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions)
