@@ -3,7 +3,6 @@
 ## Wymagania
 
 - Konto na GitHub
-- Konto na Docker Hub
 - Git zainstalowany lokalnie
 
 ## Cel
@@ -18,18 +17,37 @@ Pipeline powinien spełniać następujące wymagania:
 
 Zajrzyj do [dokumentacji GitHub Actions](https://docs.github.com/en/actions), aby dowiedzieć się więcej.
 
+## Krok 0 - Fork repozytorium
+
+Wykonaj fork tego repozytorium (przycisk "Fork" w prawym górnym rogu).
+
+> Więcej o forkowaniu w [dokumentacji GitHub](https://docs.github.com/en/get-started/quickstart/fork-a-repo).
+
+Sklonuj repozytorium na swój komputer lub cloud shell.
+
+> Jeżeli już posiadasz fork tego repozytorium dla innego zadania, możesz nowemu nadać nową nazwę, np. `basiccicd-artefakty`.
+
+```bash
+git clone https://github.com/your-username/basiccicd
+cd basiccicd
+```
+
 ## Krok 1 - Konfiguracja Docker Hub
 
 1. Utwórz konto na [Docker Hub](https://hub.docker.com/)
-2. Utwórz nowe repozytorium na Docker Hub:
+   1. Możesz podać adres mail uczelni
+   2. Zweryfikuj konto klikając na link w mailu, nie musisz wypełniać dodatkowych danych
+2. Utwórz nowe repozytorium na [Docker Hub](https://hub.docker.com/):
    - Kliknij "Create Repository"
-   - Wybierz nazwę dla swojego repozytorium
-   - Ustaw widoczność (publiczne lub prywatne)
+   - Nazwij repozytorium `weather-app`
+   - Ustaw widoczność na _public_
    - Kliknij "Create"
 3. Utwórz token dostępu dla GitHub Actions:
-   - Przejdź do Account Settings > Security
-   - Kliknij "New Access Token"
+   - W prawym górnym znajdź menu z ustawieniami konta, Przejdź do Account Settings
+   - W lewym menu wybierz "Personal access tokens"
    - Dodaj opis (np. "GitHub Actions")
+   - Ustaw expiration date na 30 dni
+   - Ustaw uprawnienia na `Read & Write` i kliknij Generate
    - Skopiuj token (będzie pokazany tylko raz!)
 
 ## Krok 2 - Konfiguracja Sekretów GitHub
@@ -52,7 +70,7 @@ Dodaj zmienną środowiskową dla nazwy repozytorium Docker:
 4. Kliknij "New repository variable"
 5. Dodaj nową zmienną:
    - Name: `DOCKER_REPOSITORY_NAME`
-   - Value: nazwa-twojego-repozytorium (np. "my-app")
+   - Value: nazwa-twojego-repozytorium (np. "weather-app")
    - Kliknij "Add variable"
 
 Ta zmienna będzie używana w workflow do określenia nazwy repozytorium Docker Hub.
@@ -65,7 +83,7 @@ Utwórz nowy branch:
 git checkout -b artifacts-with-dockerhub
 ```
 
-Utwórz plik `.github/workflows/cd-dockerhub.yml` i postępuj zgodnie z poniższymi krokami.
+Utwórz plik `.github/workflows/cd-dockerhub.yml` i postępuj zgodnie z poniższymi krokami.  
 
 Po każdym kroku wykonaj commit i push do repozytorium:
 
@@ -91,7 +109,9 @@ Utwórz job, który będzie:
 - Pobierał kod
 - Konfigurował Docker Buildx
 - Logował się do Docker Hub
-- Budował i wysyłał obraz
+
+
+Sekcja poniżej odpowiada za logowanie się do docker hub oraz uruchomienie buildu. Zauważ, że nie podajesz żadnej ścieżki do pliku.
 
 ```yaml
 jobs:
@@ -110,7 +130,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+```
 
+Sekcja poniżej odpowiada za wygenerowanie taga, składającego się z fragmentu commit hasha i bieżącej daty.
+  
+```yaml
       - name: Generate image metadata
         id: meta
         run: |
