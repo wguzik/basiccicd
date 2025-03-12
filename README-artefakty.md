@@ -172,7 +172,7 @@ Upewnij się, że Twój workflow:
 
 Twój pipeline jest teraz gotowy do automatycznego budowania i publikowania obrazów Docker!
 
-## Struktura Workflow
+## Struktura Workflow 
 
 ```mermaid
 graph TD
