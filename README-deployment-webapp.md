@@ -98,7 +98,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: weather-app-${{ steps.commit.outputs.sha_short }}
+          name: weather-app
           path: weather-app-${{ steps.commit.outputs.sha_short }}.zip
           retention-days: 1
 
@@ -114,10 +114,10 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: weather-app-${{ steps.commit.outputs.sha_short }}
+          name: weather-app
           
       - name: Extract artifact
-        run: unzip weather-app-${{ steps.commit.outputs.sha_short }}.zip -d ./app
+        run: unzip weather-app-*.zip -d ./app
 
       - name: Login to Azure
         uses: azure/login@v2
