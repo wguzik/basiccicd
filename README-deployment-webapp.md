@@ -73,7 +73,7 @@ Utwórz plik `.github/workflows/cd-webapp.yml` i postępuj zgodnie z poniższymi
 ### 2.1 Dodaj Trigger i Konfigurację Środowiska
 
 ```yaml
-name: CD Web App Container Deployment
+name: CD Web App Deployment
 
 on:
   push:
