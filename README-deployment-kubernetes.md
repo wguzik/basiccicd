@@ -22,7 +22,11 @@ Celem jest zbudowanie kompletnego pipeline'u CI/CD w GitHub Actions, który:
 2. Po utworzeniu infrastruktury, sprawdź połączenie z klastrem Kubernetes:
 
 ```bash
-az aks get-credentials --name <nazwa-klastra> --resource-group <nazwa-resource-group>
+RG_NAME=<nazwa-resource-group>
+AKS_NAME=<nazwa-clustra>
+
+az aks get-credentials --name $AKS_NAME --resource-group $RG_NAME
+
 kubectl get nodes
 ```
 
@@ -34,8 +38,7 @@ kubectl get nodes
 
 ```bash
 az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
-                         --scopes /subscriptions/<ID-SUBSKRYPCJI>/resourceGroups/<NAZWA-RESOURCE-GROUP> \
-                         --sdk-auth
+                         --scopes /subscriptions/<ID-SUBSKRYPCJI>/resourceGroups/<NAZWA-RESOURCE-GROUP>
 ```
 
 1. Przejdź do swojego repozytorium na GitHub
@@ -76,7 +79,14 @@ kubectl apply -f infra/weather_app_manifests/service.yaml
 kubectl apply -f infra/weather_app_manifests/ingress.yaml
 ```
 
-## Krok 2 - Tworzenie Workflow
+## Krok 2 - Skonfigurowanie dostępu ACR do klastra Kubernetes
+
+```bash
+$ACR_NAME=<nazwa ACR>
+az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
+```
+
+## Krok 3 - Tworzenie Workflow
 
 Utwórz nowy branch:
 
