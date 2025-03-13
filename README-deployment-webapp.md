@@ -91,14 +91,24 @@ jobs:
       - name: Get commit hash
         id: commit
         run: echo "sha_short=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Save commit hash
+        run: echo ${{ steps.commit.outputs.sha_short }} > commit_hash.txt
         
       - name: Zip application
         run: zip -r weather-app-${{ steps.commit.outputs.sha_short }}.zip ./* -r
-        
-      - name: Upload artifact
+
+      - name: Upload temp artifact
         uses: actions/upload-artifact@v4
         with:
-          name: weather-app
+          name: commit-hash
+          path: commit_hash.txt
+          retention-days: 1
+        
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-app-${{ steps.commit.outputs.sha_short }}
           path: weather-app-${{ steps.commit.outputs.sha_short }}.zip
           retention-days: 1
 
@@ -107,17 +117,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Get commit hash
-        id: commit
-        run: echo "sha_short=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
-      
-      - name: Download artifact
+      - name: Download temp artifact
         uses: actions/download-artifact@v4
         with:
-          name: weather-app
+          name: commit-hash
+
+      - name: Get commit hash
+        id: commit
+        run: cat commit_hash.txt >> $GITHUB_OUTPUT
+      
+      - name: Download app artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: weather-app-${{ steps.commit.outputs.sha_short }}
           
       - name: Extract artifact
-        run: unzip weather-app-*.zip -d ./app
+        run: unzip weather-app-${{ steps.commit.outputs.sha_short }}.zip -d ./app
 
       - name: Login to Azure
         uses: azure/login@v2
