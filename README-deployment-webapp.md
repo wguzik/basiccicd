@@ -9,14 +9,14 @@
 
 ## Cel
 
-Celem jest zbudowanie pipeline'u w GitHub Actions, który automatycznie wdraża aplikację na Azure Web App z wykorzystaniem slotów deploymentu.
+Celem jest zbudowanie pipeline'u w GitHub Actions, który automatycznie wdraża aplikację na Azure Web App z wykorzystaniem `deployment slots`.
 
 Pipeline powinien spełniać następujące wymagania:
 - Uruchamiać się przy commitach do `main`
 - Budować aplikację i przygotowywać artefakt do wdrożenia
 - Wdrażać aplikację do slotu "staging"
 - Wykonywać walidację działania aplikacji
-- Umożliwiać manualne zatwierdzenie przed przełączeniem na produkcję
+- Umożliwiać ręcznie zatwierdzenie przed przełączeniem na produkcję
 - Wykonywać swap slotów (staging -> production)
 
 ## Krok 0 - Przygotowanie Infrastruktury
