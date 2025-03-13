@@ -10,6 +10,66 @@ env:
   AZURE_WEBAPP_PACKAGE_PATH: './publish'
 
 jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Generate image metadata
+        id: meta
+        run: |
+          echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          echo "SHA=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+        
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          
+      - name: Deploy container to staging slot
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          slot-name: 'staging'
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.SHA }}-${{ env.DATE }}
+
+      - name: Verify deployment
+        run: |
+          sleep 30  # czekaj na start aplikacji
+          STAGING_URL="https://${{ env.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
+          if [ $HTTP_STATUS -ne 200 ]; then
+            echo "Deployment verification failed!"
+            exit 1
+          fi
+
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: wguzik
+          minimum-approvals: 1
+          message: 'Czy chcesz wdrożyć na produkcję?'
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Swap slots
+        run: |
+          az webapp deployment slot swap \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --slot staging \
+            --target-slot production
   build:
     name: Build Application
     runs-on: ubuntu-latest
