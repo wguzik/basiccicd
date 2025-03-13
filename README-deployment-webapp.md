@@ -37,7 +37,15 @@ az webapp deployment slot create \
 1. Przejdź do swojego repozytorium na GitHub
 2. Nawiguj do Settings > Secrets and variables > Actions
 3. Dodaj nowe sekrety repozytorium:
-   - `AZURE_CREDENTIALS`: Dane uwierzytelniające do Azure (uzyskane przez `az ad sp create-for-rbac`)
+   - `AZURE_CREDENTIALS`: Dane uwierzytelniające do Azure (uzyskane przez `az ad sp create-for-rbac` albo od prowadzącego):
+      ```json
+      {
+        "clientSecret":  "xx",
+        "subscriptionId":  "twoje-id-subskrypcji",
+        "tenantId":  "32268039-35b0-4dc1-961a-989ebea1bcae",
+        "clientId":  "yy"
+      }
+      ```
    - `AZURE_WEBAPP_NAME`: Nazwa twojej Azure Web App
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
