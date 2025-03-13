@@ -132,7 +132,6 @@ jobs:
           secret: ${{ github.TOKEN }}
           approvers: wguzik
           minimum-approvals: 1
-          message: 'Czy chcesz wdrożyć na produkcję?'
 
       - name: Login to Azure
         uses: azure/login@v2
