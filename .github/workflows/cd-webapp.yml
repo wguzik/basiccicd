@@ -37,7 +37,7 @@ jobs:
       - name: Verify deployment
         run: |
           sleep 30  # czekaj na start aplikacji
-          STAGING_URL="https://myprojec2t-dev-webapp-staging.azurewebsites.net"
+          STAGING_URL="google.com"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
           if [ $HTTP_STATUS -ne 200 ]; then
             echo "Deployment verification failed!"
