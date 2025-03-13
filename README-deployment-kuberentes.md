@@ -30,20 +30,51 @@ kubectl get nodes
 
 1. Utwórz Service Principal z dostępem do ACR i AKS:
 
+> Te poświadczenia dostaniesz od prowadzącego!
+
 ```bash
 az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
                          --scopes /subscriptions/<ID-SUBSKRYPCJI>/resourceGroups/<NAZWA-RESOURCE-GROUP> \
                          --sdk-auth
 ```
 
-2. Przejdź do swojego repozytorium na GitHub
-3. Nawiguj do Settings > Secrets and variables > Actions
-4. Dodaj nowe sekrety repozytorium:
+1. Przejdź do swojego repozytorium na GitHub
+2. Nawiguj do Settings > Secrets and variables > Actions
+3. Dodaj nowe sekrety repozytorium:
    - `AZURE_CREDENTIALS`: Dane JSON z poprzedniego kroku
    - `AZURE_REGISTRY_NAME`: Nazwa rejestru kontenerów (bez .azurecr.io)
    - `AZURE_CLUSTER_NAME`: Nazwa klastra AKS
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
    - `WEATHER_API_KEY`: Klucz API dla aplikacji pogodowej
+
+## Krok 1 - Tworzenie zasobów w Kubernetes
+
+- Na linuksie/mac:
+
+```bash
+sed -i "s|\${IMAGE_TAG}|nginx|g" infra/weather_app_manifests/deployment.yaml
+```
+
+lub edytuj ręcznie plik `deployment.yaml` w linii 21 z:
+
+```yaml
+        image: ${IMAGE_TAG}
+```
+
+na
+
+```yaml
+        image: nginx
+```
+
+- Stwórz zasoby wewnątrz kubernetesa:
+
+```bash
+kubectl apply -f infra/weather_app_manifests/namespace.yaml
+kubectl apply -f infra/weather_app_manifests/deployment.yaml
+kubectl apply -f infra/weather_app_manifests/service.yaml
+kubectl apply -f infra/weather_app_manifests/ingress.yaml
+```
 
 ## Krok 2 - Tworzenie Workflow
 
@@ -128,8 +159,6 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.image-tag.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   deploy-to-kubernetes:
     name: Deploy to Kubernetes
@@ -150,115 +179,13 @@ jobs:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.CLUSTER_NAME }}
           
-      - name: Create Kubernetes namespace if not exists
+      - name: Set image in deployment manifest
         run: |
-          kubectl create namespace weather-app --dry-run=client -o yaml | kubectl apply -f -
-          
-      - name: Create Kubernetes Secret for API Key
-        run: |
-          kubectl create secret generic weather-api-secret \
-            --from-literal=WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }} \
-            --namespace weather-app \
-            --dry-run=client -o yaml | kubectl apply -f -
-          
-      - name: Create Kubernetes manifest files
-        env:
-          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-        run: |
-          # Deployment
-          cat > deployment.yaml <<EOF
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: weather-app
-            namespace: weather-app
-            labels:
-              app: weather-app
-          spec:
-            replicas: 2
-            selector:
-              matchLabels:
-                app: weather-app
-            template:
-              metadata:
-                labels:
-                  app: weather-app
-              spec:
-                containers:
-                - name: weather-app
-                  image: ${IMAGE_TAG}
-                  ports:
-                  - containerPort: 3000
-                  resources:
-                    limits:
-                      cpu: "500m"
-                      memory: "512Mi"
-                    requests:
-                      cpu: "100m"
-                      memory: "128Mi"
-                  env:
-                  - name: WEATHER_API_KEY
-                    valueFrom:
-                      secretKeyRef:
-                        name: weather-api-secret
-                        key: WEATHER_API_KEY
-                  readinessProbe:
-                    httpGet:
-                      path: /
-                      port: 3000
-                    initialDelaySeconds: 10
-                    periodSeconds: 5
-                  livenessProbe:
-                    httpGet:
-                      path: /
-                      port: 3000
-                    initialDelaySeconds: 15
-                    periodSeconds: 10
-          EOF
-          
-          # Service
-          cat > service.yaml <<EOF
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: weather-app
-            namespace: weather-app
-          spec:
-            selector:
-              app: weather-app
-            ports:
-            - port: 80
-              targetPort: 3000
-            type: ClusterIP
-          EOF
-          
-          # Ingress
-          cat > ingress.yaml <<EOF
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
-          metadata:
-            name: weather-app-ingress
-            namespace: weather-app
-            annotations:
-              kubernetes.io/ingress.class: "azure/application-gateway"
-          spec:
-            rules:
-            - http:
-                paths:
-                - path: /
-                  pathType: Prefix
-                  backend:
-                    service:
-                      name: weather-app
-                      port:
-                        number: 80
-          EOF
+          sed -i "s|\${IMAGE_TAG}|${{ needs.build-and-push.outputs.image_tag }}|g" infra/weather_app_manifests/deployment.yaml
           
       - name: Deploy to Kubernetes
         run: |
-          kubectl apply -f deployment.yaml
-          kubectl apply -f service.yaml
-          kubectl apply -f ingress.yaml
+          kubectl apply -f infra/weather_app_manifests/deployment.yaml
           
       - name: Verify deployment
         run: |
@@ -344,13 +271,13 @@ graph TD
     B --> B9[Setup Docker Buildx]
     B --> B10[Login to ACR]
     B --> B11[Build and Push Docker Image]
-    
+  
     D --> D1[Checkout code]
     D --> D2[Login to Azure]
     D --> D3[Get AKS credentials]
-    D --> D4[Create Kubernetes namespace]
+    D --> D4[Apply namespace]
     D --> D5[Create Secret for API Key]
-    D --> D6[Create K8s manifests]
+    D --> D6[Set image in deployment manifest]
     D --> D7[Deploy to Kubernetes]
     D --> D8[Verify deployment]
     
