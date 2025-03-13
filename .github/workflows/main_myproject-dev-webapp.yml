@@ -6,7 +6,7 @@ name: Build and deploy Node.js app to Azure Web App - myproject-dev-webapp
 on:
   push:
     branches:
-      - main
+      - CD-06-webappfixes
   workflow_dispatch:
 
 jobs:
