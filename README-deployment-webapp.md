@@ -131,7 +131,7 @@ jobs:
         with:
           name: weather-app-${{ steps.commit.outputs.sha_short }}
           
-      - name: Extract artifact
+      - name: Extract app artifact
         run: unzip weather-app-${{ steps.commit.outputs.sha_short }}.zip -d ./app
 
       - name: Login to Azure

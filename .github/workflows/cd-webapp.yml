@@ -64,16 +64,16 @@ jobs:
           name: commit-hash
 
       - name: Get commit hash
-        id: commit
-        run: cat commit_hash.txt >> $GITHUB_OUTPUT
+        id: vars
+        run: echo "sha_short=$(cat commit_hash.txt)" >> $GITHUB_OUTPUT
       
       - name: Download app artifact
         uses: actions/download-artifact@v4
         with:
-          name: weather-app-${{ steps.commit.outputs.sha_short }}
+          name: weather-app-${{ steps.vars.outputs.sha_short }}
           
       - name: Extract app artifact
-        run: unzip weather-app-${{ steps.commit.outputs.sha_short }}.zip -d ./app
+        run: unzip weather-app-${{ steps.vars.outputs.sha_short }}.zip -d ./app
 
       - name: Login to Azure
         uses: azure/login@v2
