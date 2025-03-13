@@ -34,16 +34,6 @@ jobs:
           slot-name: 'staging'
           images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.SHA }}-${{ env.DATE }}
 
-      - name: Verify deployment
-        run: |
-          sleep 30  # czekaj na start aplikacji
-          STAGING_URL="google.com"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
-          if [ $HTTP_STATUS -ne 200 ]; then
-            echo "Deployment verification failed!"
-            exit 1
-          fi
-
   deploy-production:
     name: Deploy to Production
     needs: deploy-staging
