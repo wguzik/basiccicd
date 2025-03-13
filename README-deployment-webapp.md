@@ -41,8 +41,8 @@ az webapp deployment slot create \
 ## Krok 1 - Konfiguracja Sekretów GitHub
 
 1. Przejdź do swojego repozytorium na GitHub
-2. Nawiguj do Settings > Secrets and variables > Actions
-3. Dodaj nowe sekrety repozytorium:
+2. Nawiguj do Settings > Secrets and variables > Actions > Secrets
+3. Dodaj nowe sekrety:
    - `AZURE_CREDENTIALS`: Dane uwierzytelniające do Azure (uzyskane przez `az ad sp create-for-rbac` albo od prowadzącego):
       ```json
       {
@@ -52,13 +52,14 @@ az webapp deployment slot create \
         "clientId":  "yy"
       }
       ```
-   - `AZURE_WEBAPP_NAME`: Nazwa twojej Azure Web App
-   - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
+
    - `DOCKERHUB_USERNAME`: Twoja nazwa użytkownika Docker Hub
 
-4. Dodaj zmienną środowiskową:
-   - Przejdź do Settings > Secrets and variables > Actions > Variables
+4. Przejdź do Settings > Secrets and variables > Actions > Variables
+4. Dodaj zmienne środowiskowe: 
    - Dodaj `DOCKER_REPOSITORY_NAME`: Nazwa repozytorium Docker Hub (np. "weather-app")
+   - `AZURE_WEBAPP_NAME`: Nazwa twojej Azure Web App
+   - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
 ## Krok 2 - Tworzenie Workflow
 
@@ -79,8 +80,6 @@ on:
   push:
     branches: [ main ]
 
-env:
-  AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
 ```
 
 ### 2.2 Dodaj Job Wdrażania
@@ -108,14 +107,14 @@ jobs:
       - name: Deploy container to staging slot
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           slot-name: 'staging'
           images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.SHA }}-${{ env.DATE }}
 
       - name: Verify deployment
         run: |
           sleep 30  # czekaj na start aplikacji
-          STAGING_URL="https://${{ env.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
+          STAGING_URL="https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
           if [ $HTTP_STATUS -ne 200 ]; then
             echo "Deployment verification failed!"
@@ -143,8 +142,8 @@ jobs:
       - name: Swap slots
         run: |
           az webapp deployment slot swap \
-            --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ vars.AZURE_WEBAPP_NAME }} \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --slot staging \
             --target-slot production
 ```
