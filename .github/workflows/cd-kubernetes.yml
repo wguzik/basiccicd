@@ -56,6 +56,17 @@ jobs:
           push: true
           tags: ${{ steps.image-tag.outputs.tag }}
 
+      - name: Store image name
+        run: |
+          echo "image_name=${{ steps.image-tag.outputs.tag }}" >> tag.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tag.txt
+          path: tag.txt
+          retention-days: 1
+
   deploy-to-kubernetes:
     name: Deploy to Kubernetes
     needs: build-and-push
@@ -63,6 +74,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tag.txt
+          path: tag.txt
         
       - name: Login to Azure
         uses: azure/login@v2
@@ -77,7 +94,8 @@ jobs:
           
       - name: Set image in deployment manifest
         run: |
-          sed -i "s|\${IMAGE_TAG}|${{ needs.build-and-push.outputs.image_tag }}|g" infra/weather_app_manifests/deployment.yaml
+          CURRENT_IMAGE_TAG=$(cat tag.txt)
+          sed -i "s|\${IMAGE_TAG}|$CURRENT_IMAGE_TAG|g" infra/weather_app_manifests/deployment.yaml
           
       - name: Deploy to Kubernetes
         run: |
