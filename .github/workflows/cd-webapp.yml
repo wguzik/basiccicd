@@ -1,12 +1,13 @@
 name: CD Web App Deployment
 
 on:
-    push:
-      branches: [ main ]
-    pull_request:
-      branches: [ main ]
-env:
-  AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag obrazu Docker do wdrożenia'
+        required: true
+  push:
+    branches: [ main ]
 
 jobs:
   deploy-staging:
@@ -16,11 +17,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Generate image metadata
-        id: meta
+      - name: Set image tag from input or generate new one
+        id: set_tag
         run: |
-          echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-          echo "SHA=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "Using provided image tag: ${{ github.event.inputs.image_tag }}"
+            echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          else
+            echo "Generating new image tag"
+            echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+            echo "SHA=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+            echo "IMAGE_TAG=$(git rev-parse --short=8 HEAD)-$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          fi
         
       - name: Login to Azure
         uses: azure/login@v2
@@ -32,15 +40,15 @@ jobs:
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           slot-name: 'staging'
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.SHA }}-${{ env.DATE }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.IMAGE_TAG }}
 
       - name: Verify deployment
         run: |
-          sleep 30  # czekaj na start aplikacji
+          sleep 300  # czekaj na start aplikacji
           STAGING_URL="https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
-          if [ $HTTP_STATUS -ne 200 ]; then
-            echo "Deployment verification failed!"
+          response=$(curl $STAGING_URL)
+          if [[ $response == *"tired"* ]]; then
+            echo "Aplikacja jest zmęczona, szefie."
             exit 1
           fi
 
@@ -53,8 +61,9 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.TOKEN }}
-          approvers: wguzik
+          approvers: ${{ github.actor }}
           minimum-approvals: 1
+          message: 'Czy chcesz wdrożyć na produkcję?'
 
       - name: Login to Azure
         uses: azure/login@v2

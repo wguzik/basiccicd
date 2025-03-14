@@ -13,7 +13,7 @@
 Celem jest zbudowanie pipeline'u w GitHub Actions, który automatycznie wdraża aplikację kontenerową na Azure Web App z wykorzystaniem `deployment slots`.
 
 Pipeline powinien spełniać następujące wymagania:
-- Uruchamiać się przy commitach do `main`
+- Uruchamiać się automatycznie po pomyślnym zbudowaniu obrazu Docker
 - Wdrażać obraz kontenera do slotu "staging"
 - Wykonywać walidację działania aplikacji
 - Umożliwiać ręcznie zatwierdzenie przed przełączeniem na produkcję
@@ -23,9 +23,9 @@ Pipeline powinien spełniać następujące wymagania:
 
 1. Upewnij się, że obraz Docker został już zbudowany i opublikowany w Docker Hub zgodnie z [README-artefakty.md](README-artefakty.md).
 
-1. Postępuj zgodnie z instrukcją w dokumencie [README-infra.md](README-infra.md), aby utworzyć wymaganą infrastrukturę w Azure.
+2. Postępuj zgodnie z instrukcją w dokumencie [README-infra.md](README-infra.md), aby utworzyć wymaganą infrastrukturę w Azure.
 
-2. Po utworzeniu infrastruktury, dodaj slot deploymentu "staging" do Azure Web App:
+3. Po utworzeniu infrastruktury, dodaj slot deploymentu "staging" do Azure Web App:
 
 ```bash
 RG_NAME=<nazwa-resource-group>
@@ -36,7 +36,7 @@ az webapp deployment slot create \
   --slot staging
 ```
 
-3. Upewnij się, że Azure Web App jest skonfigurowana do pracy z kontenerami Docker.
+4. Upewnij się, że Azure Web App jest skonfigurowana do pracy z kontenerami Docker.
 
 ## Krok 1 - Konfiguracja Sekretów GitHub
 
@@ -56,35 +56,52 @@ az webapp deployment slot create \
    - `DOCKERHUB_USERNAME`: Twoja nazwa użytkownika Docker Hub
 
 4. Przejdź do Settings > Secrets and variables > Actions > Variables
-4. Dodaj zmienne środowiskowe: 
-   - Dodaj `DOCKER_REPOSITORY_NAME`: Nazwa repozytorium Docker Hub (np. "weather-app")
+5. Dodaj zmienne środowiskowe: 
+   - `DOCKER_REPOSITORY_NAME`: Nazwa repozytorium Docker Hub (np. "weather-app")
    - `AZURE_WEBAPP_NAME`: Nazwa twojej Azure Web App
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
-## Krok 2 - Tworzenie Workflow
+## Krok 2 - Konfiguracja Wyzwalacza Między Przepływami
 
-Utwórz nowy branch:
+### 2.1 Modyfikacja cd-dockerhub.yml
 
-```bash
-git checkout -b cd-webapp-deployment
+Zmodyfikuj plik `.github/workflows/cd-dockerhub.yml`, aby dodać wyzwalacz dla przepływu wdrażania na Azure po pomyślnym zbudowaniu obrazu Docker:
+
+```yaml
+          
+      - name: Trigger deployment workflow
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'cd-webapp.yml',
+              ref: 'main',
+              inputs: {
+                image_tag: '${{ env.SHA }}-${{ env.DATE }}'
+              }
+            })
 ```
 
-Utwórz plik `.github/workflows/cd-webapp.yml` i postępuj zgodnie z poniższymi krokami.
+### 2.2 Modyfikacja cd-webapp.yml
 
-### 2.1 Dodaj Trigger i Konfigurację Środowiska
+Stwórz plik `.github/workflows/cd-webapp.yml` i skonfiguruj go tak, aby był uruchamiany po zbudowaniu obrazu.
 
 ```yaml
 name: CD Web App Deployment
 
 on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag obrazu Docker do wdrożenia'
+        required: true
   push:
     branches: [ main ]
 
-```
-
-### 2.2 Dodaj Job Wdrażania
-
-```yaml
 jobs:
   deploy-staging:
     name: Deploy to Staging
@@ -93,11 +110,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Generate image metadata
-        id: meta
+      - name: Set image tag from input or generate new one
+        id: set_tag
         run: |
-          echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-          echo "SHA=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "Using provided image tag: ${{ github.event.inputs.image_tag }}"
+            echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          else
+            echo "Generating new image tag"
+            echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+            echo "SHA=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+            echo "IMAGE_TAG=$(git rev-parse --short=8 HEAD)-$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          fi
         
       - name: Login to Azure
         uses: azure/login@v2
@@ -109,12 +133,12 @@ jobs:
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           slot-name: 'staging'
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.SHA }}-${{ env.DATE }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.IMAGE_TAG }}
 
       - name: Verify deployment
         run: |
           sleep 30  # czekaj na start aplikacji
-          STAGING_URL="https://myprojec2t-dev-webapp-staging.azurewebsites.net"
+          STAGING_URL="https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
           if [ $HTTP_STATUS -ne 200 ]; then
             echo "Deployment verification failed!"
@@ -130,8 +154,9 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.TOKEN }}
-          approvers: wguzik
+          approvers: ${{ github.actor }}
           minimum-approvals: 1
+          message: 'Czy chcesz wdrożyć na produkcję?'
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -147,51 +172,59 @@ jobs:
             --target-slot production
 ```
 
-## Krok 3 - Testowanie Workflow
+## Krok 3 - Tworzenie Workflow
 
-1. Upewnij się, że obraz Docker został już zbudowany i opublikowany w Docker Hub zgodnie z [README-artefakty.md](README-artefakty.md).
+Utwórz nowy branch:
 
-2. Wykonaj commit i push zmian:
+```bash
+git checkout -b cd-webapp-deployment
+```
+
+Utwórz pliki workflow wedłu powyższych wzorów i wykonaj commit:
+
 ```bash
 git add .
-git commit -m "Add Web App container deployment workflow"
+git commit -m "Add Web App container deployment workflow with automated trigger"
 git push --set-upstream origin cd-webapp-deployment
 ```
 
-3. Utwórz Pull Request i przeprowadź merge do main
-4. Przejdź do zakładki Actions w GitHub, aby monitorować postęp wdrożenia
-5. Po wdrożeniu do slotu staging, zweryfikuj działanie aplikacji
+## Krok 4 - Testowanie Flow Wdrażania
+
+1. Utwórz Pull Request i przeprowadź merge do main
+2. Przepływ `cd-dockerhub.yml` powinien się uruchomić, zbudować i opublikować obraz Docker
+3. Po pomyślnym zakończeniu, automatycznie powinien uruchomić się przepływ `cd-webapp.yml`
+4. Obserwuj oba przepływy w zakładce Actions na GitHub
+5. Po wdrożeniu do slotu staging, zweryfikuj działanie aplikacji 
 6. Zatwierdź wdrożenie na produkcję w interfejsie GitHub Actions
 
-## Struktura Workflow
+## Kompletny Diagram Przepływu CI/CD
 
 ```mermaid
 graph TD
-    A[Workflow: CD Web App Container]
-    B1[Job: deploy-staging]
-    B2[Job: deploy-production]
+    A[Push do main] --> B[Workflow: CD Artifact - weather-app]
+    B --> C[Build i publikacja obrazu Docker]
+    C --> D[Trigger workflow_dispatch]
+    D --> E[Workflow: CD Web App Deployment]
+    E --> F[Deploy na slot staging]
+    F --> G[Weryfikacja wdrożenia]
+    G --> H[Oczekiwanie na zatwierdzenie]
+    H --> I[Swap slotów]
     
-    B1 --> C[Checkout]
-    B1 --> D[Get commit hash]
-    B1 --> E[Get current date]
-    B1 --> F[Login to Azure]
-    B1 --> G[Deploy to Staging]
-    B1 --> H[Verify Deployment]
-    
-    B2 --> I[Manual Approval]
-    B2 --> J[Login to Azure]
-    B2 --> K[Swap Slots]
-    
-    style A fill:#347d39,stroke:#347d39,color:#ffffff
-    style B1 fill:#347d39,stroke:#347d39,color:#ffffff
-    style B2 fill:#347d39,stroke:#347d39,color:#ffffff
-    style I fill:#ff9900,stroke:#ff9900,color:#ffffff
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#347d39,stroke:#347d39,color:#ffffff
+    style C fill:#ffffff,stroke:#30363d
+    style D fill:#ff9900,stroke:#ff9900,color:#ffffff
+    style E fill:#347d39,stroke:#347d39,color:#ffffff
+    style F fill:#ffffff,stroke:#30363d
+    style G fill:#ffffff,stroke:#30363d
+    style H fill:#ff9900,stroke:#ff9900,color:#ffffff
+    style I fill:#ffffff,stroke:#30363d
 ```
 
 ## Weryfikacja Wymagań
 
 Upewnij się, że Twój workflow:
-- [ ] Uruchamia się przy push do main
+- [ ] Wyzwalany jest automatycznie po zbudowaniu obrazu Docker
 - [ ] Wdraża obraz kontenera na slot staging
 - [ ] Weryfikuje działanie aplikacji
 - [ ] Wymaga manualnej akceptacji
@@ -200,12 +233,13 @@ Upewnij się, że Twój workflow:
 ## Najczęstsze Problemy
 
 1. **Problem z uwierzytelnianiem Docker Hub**: Upewnij się, że Azure Web App ma uprawnienia do pobierania obrazów z Docker Hub.
-2. **Błędy z tagami kontenera**: Upewnij się, że tag obrazu jest poprawnie generowany i zgodny z tym, co zostało opublikowane w Docker Hub.
+2. **Błędy z tagami kontenera**: Upewnij się, że tag obrazu jest poprawnie przekazywany między przepływami.
 3. **Timeout podczas weryfikacji**: Dostosuj czas oczekiwania na start aplikacji kontenerowej.
-4. **Problemy z konfiguracją kontenera**: Upewnij się, że Azure Web App jest poprawnie skonfigurowana do pracy z kontenerami.
+4. **Problemy z wyzwalaczem workflow_dispatch**: Upewnij się, że token GITHUB_TOKEN ma wystarczające uprawnienia do wyzwalania innych przepływów.
 
 ## Dokumentacja
 
-- [GitHub Actions](https://docs.github.com/en/actions)
+- [GitHub Actions Workflow Triggers](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows)
+- [GitHub Actions Workflow Dispatch](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflow_dispatch)
 - [Azure Web App for Containers](https://docs.microsoft.com/en-us/azure/app-service/configure-custom-container)
 - [Deployment Slots](https://docs.microsoft.com/en-us/azure/app-service/deploy-staging-slots)
