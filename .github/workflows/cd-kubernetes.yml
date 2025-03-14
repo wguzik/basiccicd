@@ -78,7 +78,7 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: tag
+          name: tag.txt
           path: tag.txt
         
       - name: Login to Azure
@@ -95,7 +95,8 @@ jobs:
       - name: Set image in deployment manifest
         run: |
           CURRENT_IMAGE_TAG=$(cat tag.txt)
-          sed -i "s|\${IMAGE_TAG}|$CURRENT_IMAGE_TAG|g" infra/weather_app_manifests/deployment.yaml
+          echo "CURRENT_IMAGE_TAG: $CURRENT_IMAGE_TAG"
+          sed -i "s|\${IMAGE_TAG}|${CURRENT_IMAGE_TAG}|g" infra/weather_app_manifests/deployment.yaml
           
       - name: Deploy to Kubernetes
         run: |
