@@ -99,8 +99,6 @@ on:
       image_tag:
         description: 'Tag obrazu Docker do wdrożenia'
         required: true
-  push:
-    branches: [ main ]
 
 jobs:
   deploy-staging:
