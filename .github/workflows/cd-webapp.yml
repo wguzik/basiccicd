@@ -61,7 +61,7 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.TOKEN }}
-          approvers: ${{ github.actor }}
+          approvers: wguzik
           minimum-approvals: 1
 
       - name: Login to Azure
