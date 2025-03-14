@@ -67,8 +67,7 @@ az webapp deployment slot create \
 
 Zmodyfikuj plik `.github/workflows/cd-dockerhub.yml`, aby dodać wyzwalacz dla przepływu wdrażania na Azure po pomyślnym zbudowaniu obrazu Docker:
 
-```yaml
-          
+```yaml   
       - name: Trigger deployment workflow
         if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/github-script@v6
@@ -156,7 +155,6 @@ jobs:
           secret: ${{ github.TOKEN }}
           approvers: ${{ github.actor }}
           minimum-approvals: 1
-          message: 'Czy chcesz wdrożyć na produkcję?'
 
       - name: Login to Azure
         uses: azure/login@v2
