@@ -139,10 +139,10 @@ jobs:
       - name: Verify deployment
         run: |
           sleep 120  # czekaj na start aplikacji
-          STAGING_URL="https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
-          if [ $HTTP_STATUS -ne 200 ]; then
-            echo "Deployment verification failed!"
+          STAGING_URL="https://wg-dev-webapp-staging.azurewebsites.net/"
+          response=$(curl $STAGING_URL)
+          if [[ $response != *"tired"* ]]; then
+            echo "Something is wrong with the staging app."
             exit 1
           fi
 
