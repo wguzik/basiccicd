@@ -15,7 +15,13 @@ resource "azurerm_linux_web_app" "this" {
 
   site_config {
     always_on = true
+    
+    application_stack {
+      docker_image_name = "nginx:latest"
+    }
+    
+    container_registry_use_managed_identity = false
   }
 
-  tags                      = var.tags
+  tags = var.tags
 }
