@@ -43,12 +43,16 @@ az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
 
 1. Przejdź do swojego repozytorium na GitHub
 2. Nawiguj do Settings > Secrets and variables > Actions
-3. Dodaj nowe sekrety repozytorium:
+3. Dodaj nowe sekrety:
    - `AZURE_CREDENTIALS`: Dane JSON z poprzedniego kroku
+   - `WEATHER_API_KEY`: Klucz API dla aplikacji pogodowej
+   - `ACR_USERNAME`: Zawartość `Username`, które znajdziesz na poziomie ACR > Settings > Access keys
+   - `ACR_PASSWORD`: Zawartość `password`, które znajdziesz na poziomie ACR > Settings > Access keys
+4. Dodaj nowe zmienne:
    - `AZURE_REGISTRY_NAME`: Nazwa rejestru kontenerów (bez .azurecr.io)
    - `AZURE_CLUSTER_NAME`: Nazwa klastra AKS
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
-   - `WEATHER_API_KEY`: Klucz API dla aplikacji pogodowej
+
 
 ## Krok 1 - Tworzenie zasobów w Kubernetes
 
@@ -107,12 +111,12 @@ on:
 env:
   APP_NAME: weather-app
   REGISTRY_NAME: ${{ secrets.AZURE_REGISTRY_NAME }}
-  CLUSTER_NAME: ${{ secrets.AZURE_CLUSTER_NAME }}
-  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  CLUSTER_NAME: ${{ vars.AZURE_CLUSTER_NAME }}
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
 
 jobs:
   build-and-push:
-    name: Build App and Push Docker Image
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.image-tag.outputs.tag }}
@@ -120,23 +124,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-#      # Node.js steps
-#      - name: Setup Node.js
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version: '20'
-#          cache: 'npm'
-#
-#      - name: Install Dependencies
-#        run: npm ci
-#
-#      - name: Run Tests
-#        run: npm test
-#
-#      - name: Build Application
-#        run: npm run build
-        
-      # Metadata preparation
       - name: Get metadata
         id: meta
         run: |
