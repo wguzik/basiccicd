@@ -136,7 +136,7 @@ jobs:
       - name: Verify deployment
         run: |
           sleep 120  # czekaj na start aplikacji
-          STAGING_URL="https://wg-dev-webapp-staging.azurewebsites.net/"
+          STAGING_URL="https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net/"
           response=$(curl $STAGING_URL)
           if [[ $response != *"tired"* ]]; then
             echo "Something is wrong with the staging app."
@@ -152,7 +152,7 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.TOKEN }}
-          approvers: ${{ github.actor }}
+          approvers: wguzik  # tutaj daj swojego użytkownika - czy da się to zrobić inaczej?
           minimum-approvals: 1
 
       - name: Login to Azure
@@ -197,7 +197,7 @@ git push --set-upstream origin cd-webapp-deployment
 ## Kompletny Diagram Przepływu CI/CD
 
 ```mermaid
-graph TD
+graph TDI am
     A[Push do main] --> B[Workflow: CD Artifact - weather-app]
     B --> C[Build i publikacja obrazu Docker]
     C --> D[Trigger workflow_dispatch]
