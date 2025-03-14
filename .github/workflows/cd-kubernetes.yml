@@ -9,7 +9,7 @@ on:
 
 env:
   APP_NAME: weather-app
-  REGISTRY_NAME: ${{ secrets.AZURE_REGISTRY_NAME }}
+  REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
   CLUSTER_NAME: ${{ vars.AZURE_CLUSTER_NAME }}
   RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
 
