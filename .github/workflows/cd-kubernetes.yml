@@ -13,6 +13,11 @@ env:
   CLUSTER_NAME: ${{ vars.AZURE_CLUSTER_NAME }}
   RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
 
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
 jobs:
   build-and-push:
     name: Build and Push Docker Image
@@ -78,8 +83,8 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: tag.txt
-          path: tag.txt
+          name: tag
+          path: .
         
       - name: Login to Azure
         uses: azure/login@v2
@@ -91,18 +96,19 @@ jobs:
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.CLUSTER_NAME }}
-          
-      - name: Set image in deployment manifest
-        run: |
-          CURRENT_IMAGE_TAG=$(cat tag.txt)
-          echo "CURRENT_IMAGE_TAG: $CURRENT_IMAGE_TAG"
-          sed -i "s|\${IMAGE_TAG}|${CURRENT_IMAGE_TAG}|g" infra/weather_app_manifests/deployment.yaml
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
           
       - name: Deploy to Kubernetes
-        run: |
-          kubectl apply -f infra/weather_app_manifests/deployment.yaml
+        uses: Azure/k8s-deploy@v5
+        with:
+          action: deploy
+          manifests: |
+            infra/weather_app_manifests/deployment.yaml
+          images: |
+            $(cat tag.txt)
           
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/weather-app -n weather-app --timeout=180s
           kubectl get pods,svc,ingress -n weather-app
