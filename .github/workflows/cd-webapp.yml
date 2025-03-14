@@ -6,8 +6,6 @@ on:
       image_tag:
         description: 'Tag obrazu Docker do wdrożenia'
         required: true
-  push:
-    branches: [ main ]
 
 jobs:
   deploy-staging:
@@ -61,7 +59,7 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.TOKEN }}
-          approvers: ${{ github.actor }}
+          approvers: wguzik
           minimum-approvals: 1
 
       - name: Login to Azure
