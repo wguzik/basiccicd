@@ -38,11 +38,12 @@ az webapp deployment slot create \
 
 4. Upewnij się, że Azure Web App jest skonfigurowana do pracy z kontenerami Docker.
 
-## Krok 1 - Konfiguracja Sekretów GitHub
+## Krok 1 - Konfiguracja GitHub
 
 1. Przejdź do swojego repozytorium na GitHub
-2. Nawiguj do Settings > Secrets and variables > Actions > Secrets
-3. Dodaj nowe sekrety:
+2. Nawiguj do Settings > Actions > General > Workflow permissions > "Read and write permissions" > Save
+3. Nawiguj do Settings > Secrets and variables > Actions > Secrets
+4. Dodaj nowe sekrety:
    - `AZURE_CREDENTIALS`: Dane uwierzytelniające do Azure (uzyskane przez `az ad sp create-for-rbac` albo od prowadzącego):
       ```json
       {
@@ -55,8 +56,8 @@ az webapp deployment slot create \
 
    - `DOCKERHUB_USERNAME`: Twoja nazwa użytkownika Docker Hub
 
-4. Przejdź do Settings > Secrets and variables > Actions > Variables
-5. Dodaj zmienne środowiskowe: 
+5. Przejdź do Settings > Secrets and variables > Actions > Variables
+6. Dodaj zmienne środowiskowe: 
    - `DOCKER_REPOSITORY_NAME`: Nazwa repozytorium Docker Hub (np. "weather-app")
    - `AZURE_WEBAPP_NAME`: Nazwa twojej Azure Web App
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
@@ -137,7 +138,7 @@ jobs:
 
       - name: Verify deployment
         run: |
-          sleep 30  # czekaj na start aplikacji
+          sleep 120  # czekaj na start aplikacji
           STAGING_URL="https://${{ vars.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
           if [ $HTTP_STATUS -ne 200 ]; then
