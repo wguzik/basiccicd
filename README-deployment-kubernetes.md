@@ -262,11 +262,11 @@ W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weathe
 - Stwórz pull request. Zauważ, że zmiana spowoduje automatyczne wdrożenie na środowisko - przerwij flow zaraz po zbudowaniu obrazu
 - Pobierz nazwę obrazu green - poznasz ją po commit hash
 
-## Krok 7 przygotuj zasoby kubernetes pod blue/green
+## Krok 7 Przygotuj zasoby kubernetes pod blue/green
   
  - w plikach 
     - `infra/weather_app_manifests/deployment-blue.yaml`
-    - `infra/weather_app_manifests/deployment-green.yaml`
+    - `infra/weather_app_manifests/deployment-green.yaml`  
    zmień nazwy obrazów na właściwe
 
 - wdróż zasoby kubernetes
@@ -277,7 +277,6 @@ W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weathe
   kubectl apply -f infra/weather_app_manifests/service-blue-green.yaml
   kubectl apply -f infra/weather_app_manifests/ingress-blue-green.yaml
   kubectl apply -f infra/weather_app_manifests/service-green-test.yaml
-  kubectl apply -f infra/weather_app_manifests/ingress-green-test.yaml
   ```
 
 - zweryfikuj czy aplikacja jest wdrożona
@@ -288,13 +287,32 @@ kubectl get pods -n weather-app -l version=blue
 kubectl get pods -n weather-app -l version=green
 ```
 
-- zweryfikuj `<IP>/green` czy widzisz aplikację we właściwej wersji i czy działa
+_- zweryfikuj `<IP>/green` czy widzisz aplikację we właściwej wersji i czy działa - krok nie działa!_
 
-- Lub zrób port forward:
+- Lub zrób port forward (tylko lokalna maszyna):
 
 ```bash
-kubectl port-forward svc/weather-app-green-test 8080:80
+kubectl -n weather-app port-forward svc/weather-app-green-test 8080:80
 ```
+
+## Krok 8 Wskaż na green deployment
+
+- przełącz wskazanie na service
+
+```bash
+kubectl patch service weather-app-blue-green -n weather-app -p '{"spec":{"selector":{"version":"green"}}}'
+```
+
+- zeskaluj pody blue
+
+```bash
+kubectl -n weather-app scale deployment weather-app blue --replicas=0
+```
+
+## Krok 9 Zasymuluj canary deployment
+
+- wskaż na service zarówno blue, jak i green
+- zeskaluj liczbę podów w green do 1, a w blue wyskaluj do 4
 
 ## Szczegóły Implementacji
 

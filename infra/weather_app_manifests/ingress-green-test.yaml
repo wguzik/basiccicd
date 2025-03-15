@@ -4,8 +4,10 @@ metadata:
   name: weather-app-green-test
   namespace: weather-app
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/use-regex: "true"
+    # Path-specific rewrite for the /green path
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      rewrite ^/green(/|$)(.*) /$2 break;
 spec:
   ingressClassName: webapprouting.kubernetes.azure.com
   rules:
@@ -16,5 +18,12 @@ spec:
             name: weather-app-green-test
             port:
               number: 80
-        path: /green(/|$)(.*)
+        path: /green
+        pathType: Prefix
+      - backend:
+          service:
+            name: weather-app-blue-green
+            port:
+              number: 80
+        path: /
         pathType: Prefix
