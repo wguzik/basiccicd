@@ -17,8 +17,7 @@ spec:
     spec:
       containers:
       - name: weather-app
-        # Image będzie zastąpiony w pipeline
-        image: ${IMAGE_TAG}
+        image: nginx:latest
         ports:
         - containerPort: 3000
         resources:

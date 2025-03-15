@@ -54,24 +54,16 @@ az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
 
-## Krok 1 - Tworzenie zasobów w Kubernetes
+## Krok 1 - Tworzenie zasobów i konfiguracja kubernetes
 
-- Na linuksie/mac:
+- Podłącz ACR do Kubernetes
 
 ```bash
-sed -i "s|\${IMAGE_TAG}|nginx|g" infra/weather_app_manifests/deployment.yaml
-```
+RG_NAME=<nazwa-resource-group>
+AKS_NAME=<nazwa-clustra>
+ACR_NAME=<nazwa acr>
 
-lub edytuj ręcznie plik `deployment.yaml` w linii 21 z:
-
-```yaml
-        image: ${IMAGE_TAG}
-```
-
-na
-
-```yaml
-        image: nginx
+az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
 ```
 
 - Stwórz zasoby wewnątrz kubernetesa:
