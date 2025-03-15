@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: weather-app
-        image: nginx:latest
+        image: wgdevacr.azurecr.io/weather-app:latest
         ports:
         - containerPort: 3000
         resources:
