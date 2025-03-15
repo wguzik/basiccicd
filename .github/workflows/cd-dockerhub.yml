@@ -1,1 +1,5 @@
+name: Container image build and push
 
+on:
+  push:
+    branches: [ main ]
