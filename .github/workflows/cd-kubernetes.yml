@@ -112,7 +112,7 @@ jobs:
           manifests: |
             infra/weather_app_manifests/deployment.yaml
           images: |
-            ${{ steps.image-tag.outputs.IMAGE_TAG }}
+            wgdevacr.azurecr.io/weather-app:7369e9e3-2025-03-15
           
       - name: Verify deployment
         run: |
