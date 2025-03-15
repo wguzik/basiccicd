@@ -275,6 +275,7 @@ W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weathe
   kubectl apply -f infra/weather_app_manifests/deployment-blue.yaml
   kubectl apply -f infra/weather_app_manifests/deployment-green.yaml
   kubectl apply -f infra/weather_app_manifests/service-blue-green.yaml
+  kubectl apply -f infra/weather_app_manifests/ingress-blue-green.yaml
   kubectl apply -f infra/weather_app_manifests/service-green-test.yaml
   kubectl apply -f infra/weather_app_manifests/ingress-green-test.yaml
   ```
