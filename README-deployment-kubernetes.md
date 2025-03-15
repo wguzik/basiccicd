@@ -258,6 +258,7 @@ W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weathe
   
   git push
   ```
+
 - Stwórz pull request. Zauważ, że zmiana spowoduje automatyczne wdrożenie na środowisko - przerwij flow zaraz po zbudowaniu obrazu
 - Pobierz nazwę obrazu green - poznasz ją po commit hash
 
@@ -278,9 +279,22 @@ W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weathe
   kubectl apply -f infra/weather_app_manifests/ingress-green-test.yaml
   ```
 
+- zweryfikuj czy aplikacja jest wdrożona
+
+```bash
+kubectl get pods -n weather-app -l version=blue
+
+kubectl get pods -n weather-app -l version=green
+```
+
 - zweryfikuj `<IP>/green` czy widzisz aplikację we właściwej wersji i czy działa
 
-## Krok
+- Lub zrób port forward:
+
+```bash
+kubectl port-forward svc/weather-app-green-test 8080:80
+```
+
 ## Szczegóły Implementacji
 
 ### Struktura Workflow
