@@ -70,7 +70,9 @@ az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
 
 ```bash
 kubectl apply -f infra/weather_app_manifests/namespace.yaml
+kubectl apply -f infra/weather_app_manifests/secret.yaml
 kubectl apply -f infra/weather_app_manifests/deployment.yaml
+kubectl apply -f infra/weather_app_manifests/secret.yaml
 kubectl apply -f infra/weather_app_manifests/service.yaml
 kubectl apply -f infra/weather_app_manifests/ingress.yaml
 ```
