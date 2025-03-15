@@ -43,50 +43,48 @@ az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
 
 1. Przejdź do swojego repozytorium na GitHub
 2. Nawiguj do Settings > Secrets and variables > Actions
-3. Dodaj nowe sekrety repozytorium:
+3. Dodaj nowe sekrety:
    - `AZURE_CREDENTIALS`: Dane JSON z poprzedniego kroku
+   - `WEATHER_API_KEY`: Klucz API dla aplikacji pogodowej
+   - `ACR_USERNAME`: Zawartość `Username`, które znajdziesz na poziomie ACR > Settings > Access keys
+   - `ACR_PASSWORD`: Zawartość `password`, które znajdziesz na poziomie ACR > Settings > Access keys
+4. Dodaj nowe zmienne:
    - `AZURE_REGISTRY_NAME`: Nazwa rejestru kontenerów (bez .azurecr.io)
    - `AZURE_CLUSTER_NAME`: Nazwa klastra AKS
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
-   - `WEATHER_API_KEY`: Klucz API dla aplikacji pogodowej
 
-## Krok 1 - Tworzenie zasobów w Kubernetes
 
-- Na linuksie/mac:
+## Krok 2 - Tworzenie zasobów i konfiguracja kubernetes
+
+- Podłącz ACR do Kubernetes
 
 ```bash
-sed -i "s|\${IMAGE_TAG}|nginx|g" infra/weather_app_manifests/deployment.yaml
-```
+RG_NAME=<nazwa-resource-group>
+AKS_NAME=<nazwa-clustra>
+ACR_NAME=<nazwa acr>
 
-lub edytuj ręcznie plik `deployment.yaml` w linii 21 z:
-
-```yaml
-        image: ${IMAGE_TAG}
-```
-
-na
-
-```yaml
-        image: nginx
+az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
 ```
 
 - Stwórz zasoby wewnątrz kubernetesa:
 
 ```bash
 kubectl apply -f infra/weather_app_manifests/namespace.yaml
+kubectl apply -f infra/weather_app_manifests/secret.yaml
 kubectl apply -f infra/weather_app_manifests/deployment.yaml
+kubectl apply -f infra/weather_app_manifests/secret.yaml
 kubectl apply -f infra/weather_app_manifests/service.yaml
 kubectl apply -f infra/weather_app_manifests/ingress.yaml
 ```
 
-## Krok 2 - Skonfigurowanie dostępu ACR do klastra Kubernetes
+## Krok 3 - Skonfigurowanie dostępu ACR do klastra Kubernetes
 
 ```bash
 $ACR_NAME=<nazwa ACR>
 az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
 ```
 
-## Krok 3 - Tworzenie Workflow
+## Krok 4 - Tworzenie Workflow
 
 Utwórz nowy branch:
 
@@ -100,19 +98,26 @@ Utwórz plik `.github/workflows/cd-kubernetes.yml` z poniższą zawartością:
 name: CD Kubernetes Deployment
 
 on:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ main ]
   workflow_dispatch:
 
 env:
   APP_NAME: weather-app
-  REGISTRY_NAME: ${{ secrets.AZURE_REGISTRY_NAME }}
-  CLUSTER_NAME: ${{ secrets.AZURE_CLUSTER_NAME }}
-  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
+  CLUSTER_NAME: ${{ vars.AZURE_CLUSTER_NAME }}
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
 
 jobs:
   build-and-push:
-    name: Build App and Push Docker Image
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.image-tag.outputs.tag }}
@@ -120,23 +125,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-#      # Node.js steps
-#      - name: Setup Node.js
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version: '20'
-#          cache: 'npm'
-#
-#      - name: Install Dependencies
-#        run: npm ci
-#
-#      - name: Run Tests
-#        run: npm test
-#
-#      - name: Build Application
-#        run: npm run build
-        
-      # Metadata preparation
       - name: Get metadata
         id: meta
         run: |
@@ -147,7 +135,6 @@ jobs:
         id: image-tag
         run: echo "tag=${{ env.REGISTRY_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.meta.outputs.sha_short }}-${{ steps.meta.outputs.date }}" >> $GITHUB_OUTPUT
           
-      # Azure and Docker steps
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -160,8 +147,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY_NAME }}.azurecr.io
-          username: ${{ secrets.AZURE_CLIENT_ID }}
-          password: ${{ secrets.AZURE_CLIENT_SECRET }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
           
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
@@ -170,6 +157,17 @@ jobs:
           push: true
           tags: ${{ steps.image-tag.outputs.tag }}
 
+      - name: Store image name
+        run: |
+          echo "${{ steps.image-tag.outputs.tag }}" >> tag.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tag
+          path: tag.txt
+          retention-days: 1
+
   deploy-to-kubernetes:
     name: Deploy to Kubernetes
     needs: build-and-push
@@ -177,6 +175,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tag
+          path: .
+        
+      - name: Read image tag
+        id: image-tag
+        run: echo "IMAGE_TAG=$(cat tag.txt)" >> $GITHUB_OUTPUT
         
       - name: Login to Azure
         uses: azure/login@v2
@@ -188,22 +196,26 @@ jobs:
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.CLUSTER_NAME }}
-          
-      - name: Set image in deployment manifest
-        run: |
-          sed -i "s|\${IMAGE_TAG}|${{ needs.build-and-push.outputs.image_tag }}|g" infra/weather_app_manifests/deployment.yaml
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
           
       - name: Deploy to Kubernetes
-        run: |
-          kubectl apply -f infra/weather_app_manifests/deployment.yaml
+        uses: Azure/k8s-deploy@v5
+        with:
+          action: deploy
+          namespace: weather-app
+          manifests: |
+            infra/weather_app_manifests/deployment.yaml
+          images: |
+            ${{ steps.image-tag.outputs.IMAGE_TAG }}
           
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/weather-app -n weather-app --timeout=180s
           kubectl get pods,svc,ingress -n weather-app
 ```
 
-## Krok 3 - Testowanie Workflow
+## Krok 5 - Testowanie Workflow
 
 1. Wykonaj commit i push zmian:
 ```bash
@@ -219,6 +231,88 @@ git push --set-upstream origin k8s-deployment
 ```bash
 kubectl get pods,svc,ing -n weather-app
 ```
+
+W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weather App.
+
+## Krok 6 Przygotuj obrazy blue/green deployment
+
+- stwórz nowy branch `k8s-blue-green`
+
+- Pobierz obraz blue
+  
+  Pobierz nazwę obrazu z pipeline, ACR lub przez podejrzenie definicji deploymentu:  
+
+  ```bash
+  kubectl get deployment -n weather-app -o=jsonpath='{.items[0].spec.template.spec.containers[0].image}'
+  ```
+
+- Podmień definicję kolorów 
+
+  ```bash
+  # W katalogu projektu
+  cp public/styles-green.css public/styles.css
+  
+  git add public/styles.css
+  
+  git commit -m "Aktualizacja stylu na wersję Green"
+  
+  git push
+  ```
+
+- Stwórz pull request. Zauważ, że zmiana spowoduje automatyczne wdrożenie na środowisko - przerwij flow zaraz po zbudowaniu obrazu
+- Pobierz nazwę obrazu green - poznasz ją po commit hash
+
+## Krok 7 Przygotuj zasoby kubernetes pod blue/green
+  
+ - w plikach 
+    - `infra/weather_app_manifests/deployment-blue.yaml`
+    - `infra/weather_app_manifests/deployment-green.yaml`  
+   zmień nazwy obrazów na właściwe
+
+- wdróż zasoby kubernetes
+
+  ```bash
+  kubectl apply -f infra/weather_app_manifests/deployment-blue.yaml
+  kubectl apply -f infra/weather_app_manifests/deployment-green.yaml
+  kubectl apply -f infra/weather_app_manifests/service-blue-green.yaml
+  kubectl apply -f infra/weather_app_manifests/ingress-blue-green.yaml
+  kubectl apply -f infra/weather_app_manifests/service-green-test.yaml
+  ```
+
+- zweryfikuj czy aplikacja jest wdrożona
+
+```bash
+kubectl get pods -n weather-app -l version=blue
+
+kubectl get pods -n weather-app -l version=green
+```
+
+_- zweryfikuj `<IP>/green` czy widzisz aplikację we właściwej wersji i czy działa - krok nie działa!_
+
+- Lub zrób port forward (tylko lokalna maszyna):
+
+```bash
+kubectl -n weather-app port-forward svc/weather-app-green-test 8080:80
+```
+
+## Krok 8 Wskaż na green deployment
+
+- przełącz wskazanie na service
+
+```bash
+kubectl patch service weather-app-blue-green -n weather-app -p '{"spec":{"selector":{"version":"green"}}}'
+```
+
+- zeskaluj pody blue
+
+```bash
+kubectl -n weather-app scale deployment weather-app blue --replicas=0
+```
+
+## Krok 9 Zasymuluj canary deployment
+
+- wskaż na service zarówno blue, jak i green
+- zeskaluj liczbę podów w green do 1, a w blue wyskaluj do 4
 
 ## Szczegóły Implementacji
 
