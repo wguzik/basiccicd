@@ -2,7 +2,8 @@ name: Container image build and push
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
+
 jobs:
   docker:
     name: Build and Push Docker Image
@@ -19,7 +20,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
+
       - name: Generate image metadata
         id: meta
         run: |
