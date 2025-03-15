@@ -38,7 +38,6 @@ jobs:
         id: image-tag
         run: echo "tag=${{ env.REGISTRY_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.meta.outputs.sha_short }}-${{ steps.meta.outputs.date }}" >> $GITHUB_OUTPUT
           
-      # Azure and Docker steps
       - name: Login to Azure
         uses: azure/login@v2
         with:

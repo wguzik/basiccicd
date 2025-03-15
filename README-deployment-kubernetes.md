@@ -54,7 +54,7 @@ az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
 
-## Krok 1 - Tworzenie zasobów i konfiguracja kubernetes
+## Krok 2 - Tworzenie zasobów i konfiguracja kubernetes
 
 - Podłącz ACR do Kubernetes
 
@@ -77,14 +77,14 @@ kubectl apply -f infra/weather_app_manifests/service.yaml
 kubectl apply -f infra/weather_app_manifests/ingress.yaml
 ```
 
-## Krok 2 - Skonfigurowanie dostępu ACR do klastra Kubernetes
+## Krok 3 - Skonfigurowanie dostępu ACR do klastra Kubernetes
 
 ```bash
 $ACR_NAME=<nazwa ACR>
 az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
 ```
 
-## Krok 3 - Tworzenie Workflow
+## Krok 4 - Tworzenie Workflow
 
 Utwórz nowy branch:
 
@@ -98,6 +98,8 @@ Utwórz plik `.github/workflows/cd-kubernetes.yml` z poniższą zawartością:
 name: CD Kubernetes Deployment
 
 on:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -107,6 +109,11 @@ env:
   REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
   CLUSTER_NAME: ${{ vars.AZURE_CLUSTER_NAME }}
   RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
 
 jobs:
   build-and-push:
@@ -128,7 +135,6 @@ jobs:
         id: image-tag
         run: echo "tag=${{ env.REGISTRY_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.meta.outputs.sha_short }}-${{ steps.meta.outputs.date }}" >> $GITHUB_OUTPUT
           
-      # Azure and Docker steps
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -151,6 +157,17 @@ jobs:
           push: true
           tags: ${{ steps.image-tag.outputs.tag }}
 
+      - name: Store image name
+        run: |
+          echo "${{ steps.image-tag.outputs.tag }}" >> tag.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tag
+          path: tag.txt
+          retention-days: 1
+
   deploy-to-kubernetes:
     name: Deploy to Kubernetes
     needs: build-and-push
@@ -158,6 +175,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tag
+          path: .
+        
+      - name: Read image tag
+        id: image-tag
+        run: echo "IMAGE_TAG=$(cat tag.txt)" >> $GITHUB_OUTPUT
         
       - name: Login to Azure
         uses: azure/login@v2
@@ -169,22 +196,26 @@ jobs:
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.CLUSTER_NAME }}
-          
-      - name: Set image in deployment manifest
-        run: |
-          sed -i "s|\${IMAGE_TAG}|${{ needs.build-and-push.outputs.image_tag }}|g" infra/weather_app_manifests/deployment.yaml
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
           
       - name: Deploy to Kubernetes
-        run: |
-          kubectl apply -f infra/weather_app_manifests/deployment.yaml
+        uses: Azure/k8s-deploy@v5
+        with:
+          action: deploy
+          namespace: weather-app
+          manifests: |
+            infra/weather_app_manifests/deployment.yaml
+          images: |
+            ${{ steps.image-tag.outputs.IMAGE_TAG }}
           
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/weather-app -n weather-app --timeout=180s
           kubectl get pods,svc,ingress -n weather-app
 ```
 
-## Krok 3 - Testowanie Workflow
+## Krok 5 - Testowanie Workflow
 
 1. Wykonaj commit i push zmian:
 ```bash
@@ -201,6 +232,55 @@ git push --set-upstream origin k8s-deployment
 kubectl get pods,svc,ing -n weather-app
 ```
 
+W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weather App.
+
+## Krok 6 Przygotuj obrazy blue/green deployment
+
+- stwórz nowy branch `k8s-blue-green`
+
+- Pobierz obraz blue
+  
+  Pobierz nazwę obrazu z pipeline, ACR lub przez podejrzenie definicji deploymentu:  
+
+  ```bash
+  kubectl get deployment -n weather-app -o=jsonpath='{.items[0].spec.template.spec.containers[0].image}'
+  ```
+
+- Podmień definicję kolorów 
+
+  ```bash
+  # W katalogu projektu
+  cp public/styles-green.css public/styles.css
+  
+  git add public/styles.css
+  
+  git commit -m "Aktualizacja stylu na wersję Green"
+  
+  git push
+  ```
+- Stwórz pull request. Zauważ, że zmiana spowoduje automatyczne wdrożenie na środowisko - przerwij flow zaraz po zbudowaniu obrazu
+- Pobierz nazwę obrazu green - poznasz ją po commit hash
+
+## Krok 7 przygotuj zasoby kubernetes pod blue/green
+  
+ - w plikach 
+    - `infra/weather_app_manifests/deployment-blue.yaml`
+    - `infra/weather_app_manifests/deployment-green.yaml`
+   zmień nazwy obrazów na właściwe
+
+- wdróż zasoby kubernetes
+
+  ```bash
+  kubectl apply -f infra/weather_app_manifests/deployment-blue.yaml
+  kubectl apply -f infra/weather_app_manifests/deployment-green.yaml
+  kubectl apply -f infra/weather_app_manifests/service-blue-green.yaml
+  kubectl apply -f infra/weather_app_manifests/service-green-test.yaml
+  kubectl apply -f infra/weather_app_manifests/ingress-green-test.yaml
+  ```
+
+- zweryfikuj `<IP>/green` czy widzisz aplikację we właściwej wersji i czy działa
+
+## Krok
 ## Szczegóły Implementacji
 
 ### Struktura Workflow
