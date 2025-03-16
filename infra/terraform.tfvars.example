@@ -1,0 +1,5 @@
+project_name = "myproject"
+environment  = "dev"
+owner        = "team-name"
+location     = "westeurope"
+subscription_id = "aaa-bb-cc-dd"

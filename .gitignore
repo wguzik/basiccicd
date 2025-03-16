@@ -47,3 +47,10 @@ yarn-error.log*
 
 # Quality
 coverage/
+
+# Terraform
+terraform.tfvars
+*.lock.hcl
+*.tfstate
+*.tfstate.backup
+.terraform/
