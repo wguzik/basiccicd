@@ -47,7 +47,7 @@ jobs:
           head-ref: ${{ github.event.pull_request.head.sha }}
 ```
 
-Nawiguj do "Settings" (zakładka) > "Code security" (po lewej) > "Dependency graph" ustaw na `Enabled`.
+Nawiguj do "Settings" (zakładka) > "Advanced Security" (po lewej) > "Dependency graph" ustaw na `Enabled`.
 
 ### 1.4 Dodaj skanowanie NPM
 
@@ -117,7 +117,7 @@ updates:
 
 ### 2.2 Włącz Dependabot w repozytorium
 
-1. Wybierz "Settings" > "Code security" i wybierz:
+1. Wybierz "Settings" > "Advanced Security" i wybierz:
    1.  "Dependabot alerts" > "Enable"
    2.  "Dependabot security updates" > "Configure" - zobacz swój workflow
 2. Przejdź do "Settings" > "Code security and analysis"
@@ -131,7 +131,7 @@ updates:
 
 Włącz CodeQL w repozytorium:
 
-1. Wybierz "Settings" > "Code security and analysis"
+1. Wybierz "Settings" > "Advanced Security"
 2. Włącz "Code scanning alerts"
 3. Włącz "CodeQL analysis"
 
@@ -145,7 +145,6 @@ Przejdź do "Security" > "Code scanning" i zobacz wyniki.
    - Kliknij "Run workflow"
 
 ## Krok 4 - Wymuszenie polityk na branchu
-
 
 Dodaj policy, które wymusza przejście workflow na zielono przed mergem.
 
