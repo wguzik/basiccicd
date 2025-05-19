@@ -30,7 +30,7 @@ jobs:
         continue-on-error: true
 
   docker:
-    name: Docker Build and Test
+    name: Build and Test - Docker
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -65,3 +65,22 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker rm -f weather-app-container
+
+  SBOM:
+    name: Build and Test - SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom.json
+      
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 1
