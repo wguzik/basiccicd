@@ -27,7 +27,6 @@ variable "sku_name" {
 variable "integration_subnet_id" {
   description = "Subnet ID for VNet integration"
   type        = string
-  default     = null
 }
 
 variable "tags" {
