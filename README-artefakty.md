@@ -110,7 +110,6 @@ Utwórz job, który będzie:
 - Konfigurował Docker Buildx
 - Logował się do Docker Hub
 
-
 Sekcja poniżej odpowiada za logowanie się do docker hub oraz uruchomienie buildu. Zauważ, że nie podajesz żadnej ścieżki do pliku.
 
 ```yaml
@@ -172,7 +171,7 @@ Upewnij się, że Twój workflow:
 
 Twój pipeline jest teraz gotowy do automatycznego budowania i publikowania obrazów Docker!
 
-## Struktura Workflow 
+## Struktura Workflow
 
 ```mermaid
 graph TD

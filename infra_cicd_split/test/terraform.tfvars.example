@@ -1,0 +1,15 @@
+# Azure Subscription ID
+# Find your subscription ID by running: az account show
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Project name - used in resource naming
+project_name = "webapp"
+
+# Environment - test or prod
+environment = "test"
+
+# Azure region
+location = "westeurope"
+
+# Owner or team name
+owner = "devteam"

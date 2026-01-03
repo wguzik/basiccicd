@@ -15,6 +15,8 @@ Celem jest zbudowanie kompletnego pipeline'u CI/CD w GitHub Actions, który:
 - Publikuje obraz w Azure Container Registry
 - Wdraża aplikację na klaster Kubernetes w Azure
 
+> **💡 Dla zaawansowanych:** Po ukończeniu tego modułu możesz rozszerzyć deployment o GitOps z Argo CD. Zobacz [README-gitops.md](README-gitops.md) aby wdrożyć automatyczne synchronizacje z Git, multi-environment management i zaawansowane wzorce wdrożeń.
+
 ## Krok 0 - Przygotowanie Infrastruktury
 
 1. Postępuj zgodnie z instrukcją w dokumencie [README-infra.md](README-infra.md), aby utworzyć wymaganą infrastrukturę w Azure, w tym klaster AKS i Azure Container Registry.
@@ -53,38 +55,41 @@ az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
    - `AZURE_CLUSTER_NAME`: Nazwa klastra AKS
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
+## Krok 2 - Konfiguracja ACR i wdrożenie zasobów Kubernetes
 
-## Krok 2 - Tworzenie zasobów i konfiguracja kubernetes
+### 2.1 Podłącz ACR do klastra Kubernetes
 
-- Podłącz ACR do Kubernetes
+Umożliwi to klastrowi AKS pobieranie obrazów z Azure Container Registry bez dodatkowej autoryzacji:
 
 ```bash
-RG_NAME=<nazwa-resource-group>
-AKS_NAME=<nazwa-clustra>
-ACR_NAME=<nazwa acr>
+# Ustaw zmienne środowiskowe
+export RG_NAME="<nazwa-resource-group>"
+export AKS_NAME="<nazwa-klastra>"
+export ACR_NAME="<nazwa-acr>"
 
+# Podłącz ACR do AKS
 az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
 ```
 
-- Stwórz zasoby wewnątrz kubernetesa:
+### 2.2 Wdróż zasoby Kubernetes
+
+Zamiast aplikować każdy manifest osobno, użyj pojedynczej komendy dla całego katalogu:
 
 ```bash
-kubectl apply -f infra/weather_app_manifests/namespace.yaml
-kubectl apply -f infra/weather_app_manifests/secret.yaml
-kubectl apply -f infra/weather_app_manifests/deployment.yaml
-kubectl apply -f infra/weather_app_manifests/secret.yaml
-kubectl apply -f infra/weather_app_manifests/service.yaml
-kubectl apply -f infra/weather_app_manifests/ingress.yaml
+# Wdróż wszystkie manifesty jedną komendą
+kubectl apply -f infra/weather_app_manifests/
 ```
 
-## Krok 3 - Skonfigurowanie dostępu ACR do klastra Kubernetes
+> **💡 Wskazówka:** Komenda `kubectl apply -f <katalog>/` automatycznie aplikuje wszystkie pliki YAML w katalogu. Jest to prostsze i szybsze niż wykonywanie osobnych komend dla każdego pliku.
+
+Weryfikacja wdrożenia:
 
 ```bash
-$ACR_NAME=<nazwa ACR>
-az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
+# Sprawdź czy wszystkie zasoby zostały utworzone
+kubectl get all -n weather-app
 ```
 
-## Krok 4 - Tworzenie Workflow
+## Krok 3 - Tworzenie Workflow
 
 Utwórz nowy branch:
 
@@ -215,7 +220,7 @@ jobs:
           kubectl get pods,svc,ingress -n weather-app
 ```
 
-## Krok 5 - Testowanie Workflow
+## Krok 4 - Testowanie Workflow
 
 1. Wykonaj commit i push zmian:
 ```bash
@@ -234,7 +239,7 @@ kubectl get pods,svc,ing -n weather-app
 
 W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weather App.
 
-## Krok 6 Przygotuj obrazy blue/green deployment
+## Krok 5 - Przygotuj obrazy blue/green deployment
 
 - stwórz nowy branch `k8s-blue-green`
 
@@ -262,9 +267,9 @@ W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weathe
 - Stwórz pull request. Zauważ, że zmiana spowoduje automatyczne wdrożenie na środowisko - przerwij flow zaraz po zbudowaniu obrazu
 - Pobierz nazwę obrazu green - poznasz ją po commit hash
 
-## Krok 7 Przygotuj zasoby kubernetes pod blue/green
+## Krok 6 - Przygotuj zasoby kubernetes pod blue/green
   
- - w plikach 
+ - w plikach
     - `infra/weather_app_manifests/deployment-blue.yaml`
     - `infra/weather_app_manifests/deployment-green.yaml`  
    zmień nazwy obrazów na właściwe
@@ -295,7 +300,7 @@ _- zweryfikuj `<IP>/green` czy widzisz aplikację we właściwej wersji i czy dz
 kubectl -n weather-app port-forward svc/weather-app-green-test 8080:80
 ```
 
-## Krok 8 Wskaż na green deployment
+## Krok 7 - Wskaż na green deployment
 
 - przełącz wskazanie na service
 
@@ -309,7 +314,7 @@ kubectl patch service weather-app-blue-green -n weather-app -p '{"spec":{"select
 kubectl -n weather-app scale deployment weather-app blue --replicas=0
 ```
 
-## Krok 9 Zasymuluj canary deployment
+## Krok 8 - Zasymuluj canary deployment
 
 - wskaż na service zarówno blue, jak i green
 - zeskaluj liczbę podów w green do 1, a w blue wyskaluj do 4
@@ -413,9 +418,25 @@ kubectl get ingress weather-app-ingress -n weather-app
 kubectl logs -l app=weather-app -n weather-app
 ```
 
+## Następne Kroki
+
+### Automatyzacja z GitOps (Zaawansowane)
+
+W tym module używaliśmy `kubectl apply` w GitHub Actions do wdrażania aplikacji. Alternatywnym, bardziej zaawansowanym podejściem jest **GitOps z Argo CD**, które oferuje:
+
+**Deklaratywne zarządzanie** - Git jako single source of truth  
+**Automatyczna synchronizacja** - Argo CD wykrywa zmiany w repo i automatycznie aktualizuje klaster  
+**Self-healing** - Automatyczne cofanie ręcznych zmian w klastrze  
+**Multi-environment** - Łatwe zarządzanie dev/staging/prod  
+**Drift detection** - Wykrywanie różnic między Git a klastrem  
+**Rollback** - Łatwy powrót do poprzednich wersji
+
+Aby wdrożyć GitOps, zobacz **[README-gitops.md](README-gitops.md)** (~2h, poziom średnio-zaawansowany).
+
 ## Dokumentacja
 
 - [GitHub Actions](https://docs.github.com/en/actions)
 - [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/aks/)
 - [Kubernetes Documentation](https://kubernetes.io/docs/home/)
 - [Docker Buildx](https://docs.docker.com/engine/reference/commandline/buildx/)
+- [GitOps with Argo CD](https://argo-cd.readthedocs.io/) - dla zaawansowanych

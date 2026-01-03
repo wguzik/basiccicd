@@ -122,8 +122,27 @@ terraform destroy
 2. **Konflikt nazw**: Niektóre zasoby wymagają unikalnych nazw w skali globalnej (np. ACR).
 3. **Limity zasobów**: Sprawdź czy masz wystarczające limity w subskrypcji.
 
+## Następne Kroki
+
+### Automatyzacja Terraform w Pipeline (Zaawansowane)
+
+W tym module używaliśmy Terraform manualnie. Dla zespołów chcących wdrożyć Infrastructure as Code w pełni zautomatyzowany sposób, zobacz:
+
+- **[README-gitops.md](README-gitops.md)** - część 3 zawiera konfigurację Terraform w GitHub Actions z:
+  - Automatycznym `terraform plan` na Pull Requests
+  - Automatycznym `terraform apply` po merge do `main`
+  - Drift detection - wykrywanie ręcznych zmian w infrastrukturze
+  - Remote state w Azure Storage Backend
+
+To podejście zapewnia:
+- Code review dla zmian infrastruktury
+- Audit trail wszystkich zmian
+- Ochronę przed driftem konfiguracji
+- Automatyczne wykrywanie konfliktów
+
 ## Dokumentacja
 
 - [Terraform Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/)
 - [AKS Documentation](https://learn.microsoft.com/en-us/azure/aks/)
+- [Terraform Automation Best Practices](https://developer.hashicorp.com/terraform/tutorials/automation)
