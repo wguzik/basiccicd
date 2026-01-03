@@ -255,14 +255,14 @@ terraform state list
 
 ## Różnice między Test i Prod
 
-| Aspekt | Test | Prod |
-|--------|------|------|
-| Adres VNet | 10.0.0.0/16 | 10.1.0.0/16 |
-| Subnet App | 10.0.0.0/24 | 10.1.0.0/24 |
-| Subnet Data | 10.0.1.0/24 | 10.1.1.0/24 |
-| Subnet Integration | 10.0.2.0/24 | 10.1.2.0/24 |
-| Environment tag | test | prod |
-| Stan Terraform | test/terraform.tfstate | prod/terraform.tfstate |
+| Aspekt             | Test                   | Prod                   |
+| ------------------ | ---------------------- | ---------------------- |
+| Adres VNet         | 10.0.0.0/16            | 10.1.0.0/16            |
+| Subnet App         | 10.0.0.0/24            | 10.1.0.0/24            |
+| Subnet Data        | 10.0.1.0/24            | 10.1.1.0/24            |
+| Subnet Integration | 10.0.2.0/24            | 10.1.2.0/24            |
+| Environment tag    | test                   | prod                   |
+| Stan Terraform     | test/terraform.tfstate | prod/terraform.tfstate |
 
 ## Zarządzanie Środowiskami
 

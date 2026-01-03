@@ -10,7 +10,8 @@
 Celem jest zbudowanie pipeline'u w GitHub Actions, który automatycznie buduje i publikuje obrazy Docker do Docker Hub.
 
 Pipeline powinien spełniać następujące wymagania:
-- Uruchamiać się przy commitach do `main` - a więc po domknięciu Pull Requesty
+
+- Uruchamiać się przy commitach do `main` - a więc po domknięciu Pull Requestu
 - Budować obraz kontenera i tagować w oparciu o commit i datę merge'a
 - Format tagu powinien zawierać pierwsze 8 znaków hasha commita oraz datę (yyyy-MM-dd)
 - Przesyłać zbudowany obraz do rejestru Docker Hub
@@ -106,6 +107,7 @@ on:
 ### 3.2 Dodaj Job Budowania Docker
 
 Utwórz job, który będzie:
+
 - Pobierał kod
 - Konfigurował Docker Buildx
 - Logował się do Docker Hub
@@ -151,6 +153,7 @@ Sekcja poniżej odpowiada za wygenerowanie taga, składającego się z fragmentu
 ## Krok 5 - Testowanie Workflow
 
 1. Wykonaj commit:
+
 ```bash
 git add .
 git commit -m "Add Docker workflow"
@@ -158,12 +161,13 @@ git push
 ```
 
 1. Stwórz pull request i go zmerge'uj.
-2. Przejdź do zakładki GitHub Actions, aby monitorować uruchomienie workflow 
+2. Przejdź do zakładki GitHub Actions, aby monitorować uruchomienie workflow
 3. Po pomyślnym zakończeniu, sprawdź swoje repozytorium Docker Hub w poszukiwaniu nowego obrazu
 
 ## Krok 6 - Weryfikacja Wymagań
 
 Upewnij się, że Twój workflow:
+
 - [x] Uruchamia się przy push do gałęzi master
 - [x] Poprawnie buduje obraz Docker
 - [x] Taguje obraz hashem commita i datą
