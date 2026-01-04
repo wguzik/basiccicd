@@ -6,7 +6,9 @@
 - Konto Azure z aktywną subskrypcją
 - Git zainstalowany lokalnie
 - Azure CLI
-- Zbudowany obraz Docker w Docker Hub (zgodnie z README-artefakty.md)
+- Wdrożona infrastruktura Azure z ACR (zgodnie z [README-infra.md](README-infra.md))
+- Skonfigurowane uwierzytelnianie GitHub-Azure (zgodnie z [README-github-azure-auth-simple.md](README-github-azure-auth-simple.md))
+- Zbudowany obraz Docker w ACR (zgodnie z [README-artefakty-acr.md](README-artefakty-acr.md))
 
 ## Cel
 
@@ -21,11 +23,13 @@ Pipeline powinien spełniać następujące wymagania:
 
 ## Krok 0 - Przygotowanie Infrastruktury
 
-1. Upewnij się, że obraz Docker został już zbudowany i opublikowany w Docker Hub zgodnie z [README-artefakty.md](README-artefakty.md).
+1. Postępuj zgodnie z instrukcją w dokumencie [README-infra.md](README-infra.md), aby utworzyć wymaganą infrastrukturę w Azure (włącznie z ACR i Web App).
 
-2. Postępuj zgodnie z instrukcją w dokumencie [README-infra.md](README-infra.md), aby utworzyć wymaganą infrastrukturę w Azure.
+2. Skonfiguruj uwierzytelnianie GitHub z Azure zgodnie z [README-github-azure-auth-simple.md](README-github-azure-auth-simple.md). Upewnij się, że Managed Identity ma rolę `Website Contributor` dla Web App.
 
-3. Po utworzeniu infrastruktury, dodaj slot deploymentu "staging" do Azure Web App:
+3. Zbuduj i opublikuj obraz Docker w ACR zgodnie z [README-artefakty-acr.md](README-artefakty-acr.md).
+
+4. Po utworzeniu infrastruktury, dodaj slot deploymentu "staging" do Azure Web App:
 
 ```bash
 RG_NAME=<nazwa-resource-group>
@@ -36,37 +40,51 @@ az webapp deployment slot create \
   --slot staging
 ```
 
-4. Upewnij się, że Azure Web App jest skonfigurowana do pracy z kontenerami Docker.
+5. Skonfiguruj Web App do pobierania obrazów z ACR:
+
+```bash
+ACR_NAME=<nazwa-acr>
+
+# Podłącz ACR do Web App
+az webapp config container set \
+  --name $WEBAPP_NAME \
+  --resource-group $RG_NAME \
+  --docker-custom-image-name $ACR_NAME.azurecr.io/weather-app:latest \
+  --docker-registry-server-url https://$ACR_NAME.azurecr.io
+
+# Umożliw Web App użycie managed identity do pobierania z ACR
+az webapp config set \
+  --name $WEBAPP_NAME \
+  --resource-group $RG_NAME \
+  --generic-configurations '{"acrUseManagedIdentityCreds": true}'
+```
 
 ## Krok 1 - Konfiguracja GitHub
 
 1. Przejdź do swojego repozytorium na GitHub
 2. Nawiguj do Settings > Actions > General > Workflow permissions > "Read and write permissions" > Save
-3. Nawiguj do Settings > Secrets and variables > Actions > Secrets
-4. Dodaj nowe sekrety:
-   - `AZURE_CREDENTIALS`: Dane uwierzytelniające do Azure (uzyskane przez `az ad sp create-for-rbac` albo od prowadzącego):
-      ```json
-      {
-        "clientSecret":  "xx",
-        "subscriptionId":  "twoje-id-subskrypcji",
-        "tenantId":  "32268039-35b0-4dc1-961a-989ebea1bcae",
-        "clientId":  "yy"
-      }
-      ```
 
-   - `DOCKERHUB_USERNAME`: Twoja nazwa użytkownika Docker Hub
+### 1.1 Sekrety (Secrets)
 
-5. Przejdź do Settings > Secrets and variables > Actions > Variables
-6. Dodaj zmienne środowiskowe: 
-   - `DOCKER_REPOSITORY_NAME`: Nazwa repozytorium Docker Hub (np. "weather-app")
+Upewnij się, że masz już skonfigurowane sekrety z [README-github-azure-auth-simple.md](README-github-azure-auth-simple.md):
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+
+### 1.2 Zmienne (Variables)
+
+3. Przejdź do Settings > Secrets and variables > Actions > Variables
+4. Dodaj zmienne środowiskowe:
+   - `ACR_NAME`: Nazwa Azure Container Registry (bez .azurecr.io)
+   - `IMAGE_NAME`: Nazwa obrazu (np. "weather-app")
    - `AZURE_WEBAPP_NAME`: Nazwa twojej Azure Web App
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
 ## Krok 2 - Konfiguracja Wyzwalacza Między Przepływami
 
-### 2.1 Modyfikacja cd-dockerhub.yml
+### 2.1 Modyfikacja cd-acr.yml
 
-Zmodyfikuj plik `.github/workflows/cd-dockerhub.yml`, aby dodać wyzwalacz dla przepływu wdrażania na Azure po pomyślnym zbudowaniu obrazu Docker:
+Zmodyfikuj plik `.github/workflows/cd-acr.yml`, aby dodać wyzwalacz dla przepływu wdrażania na Azure po pomyślnym zbudowaniu obrazu Docker w ACR:
 
 ```yaml   
       - name: Trigger deployment workflow
@@ -104,6 +122,11 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write  # Wymagane dla OIDC
+      contents: read
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -124,14 +147,16 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           
       - name: Deploy container to staging slot
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           slot-name: 'staging'
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ vars.DOCKER_REPOSITORY_NAME }}:${{ env.IMAGE_TAG }}
+          images: ${{ vars.ACR_NAME }}.azurecr.io/${{ vars.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
       - name: Verify deployment
         run: |
@@ -147,6 +172,11 @@ jobs:
     name: Deploy to Production
     needs: deploy-staging
     runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
     steps:
       - name: Wait for approval
         uses: trstringer/manual-approval@v1
@@ -158,7 +188,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Swap slots
         run: |
@@ -188,7 +220,7 @@ git push --set-upstream origin cd-webapp-deployment
 ## Krok 4 - Testowanie Flow Wdrażania
 
 1. Utwórz Pull Request i przeprowadź merge do main
-2. Przepływ `cd-dockerhub.yml` powinien się uruchomić, zbudować i opublikować obraz Docker
+2. Przepływ `cd-acr.yml` powinien się uruchomić, zbudować i opublikować obraz Docker w ACR
 3. Po pomyślnym zakończeniu, automatycznie powinien uruchomić się przepływ `cd-webapp.yml`
 4. Obserwuj oba przepływy w zakładce Actions na GitHub
 5. Po wdrożeniu do slotu staging, zweryfikuj działanie aplikacji 
@@ -229,10 +261,22 @@ Upewnij się, że Twój workflow:
 
 ## Najczęstsze Problemy
 
-1. **Problem z uwierzytelnianiem Docker Hub**: Upewnij się, że Azure Web App ma uprawnienia do pobierania obrazów z Docker Hub.
+1. **Problem z uwierzytelnianiem ACR**: 
+   - Upewnij się, że Web App ma włączoną opcję `acrUseManagedIdentityCreds`
+   - Sprawdź czy Web App ma uprawnienia do pobierania obrazów z ACR (rola `AcrPull`)
+   ```bash
+   # Przydziel rolę AcrPull dla Web App
+   WEBAPP_PRINCIPAL_ID=$(az webapp identity show --name $WEBAPP_NAME --resource-group $RG_NAME --query principalId -o tsv)
+   az role assignment create \
+     --role "AcrPull" \
+     --assignee-object-id $WEBAPP_PRINCIPAL_ID \
+     --assignee-principal-type ServicePrincipal \
+     --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RG_NAME/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"
+   ```
 2. **Błędy z tagami kontenera**: Upewnij się, że tag obrazu jest poprawnie przekazywany między przepływami.
 3. **Timeout podczas weryfikacji**: Dostosuj czas oczekiwania na start aplikacji kontenerowej.
 4. **Problemy z wyzwalaczem workflow_dispatch**: Upewnij się, że token GITHUB_TOKEN ma wystarczające uprawnienia do wyzwalania innych przepływów.
+5. **Błąd OIDC**: Upewnij się, że workflow ma `permissions: id-token: write` w każdym jobie.
 
 ## Dokumentacja
 

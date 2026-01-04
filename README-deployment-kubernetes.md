@@ -38,14 +38,17 @@ kubectl get nodes
 
 Wykonaj kroki z [README-github-azure-auth-simple](./README-github-azure-auth-simple.md).
 
-### 1.2 Detale Azure
+### 1.2 Zmienne GitHub
 
-2. Przejdź do swojego repozytorium na GitHub
-3. Nawiguj do Settings > Secrets and variables > Actions
-4. Dodaj nowe zmienne:
+1. Przejdź do swojego repozytorium na GitHub
+2. Nawiguj do Settings > Secrets and variables > Actions
+3. Przejdź do zakładki "Variables"
+4. Dodaj następujące zmienne:
    - `ACR_NAME`: Nazwa rejestru kontenerów (bez .azurecr.io)
    - `AZURE_CLUSTER_NAME`: Nazwa klastra AKS
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
+
+> **💡 Uwaga:** Workflow używa Managed Identity z OIDC (skonfigurowanej w kroku 1.1) zamiast haseł, co jest zgodne z najlepszymi praktykami Zero Trust.
 
 ## Krok 2 - Konfiguracja ACR i wdrożenie zasobów Kubernetes
 
@@ -86,7 +89,33 @@ Weryfikacja wdrożenia:
 kubectl get all -n weather-app
 ```
 
-## Krok 3 - Tworzenie Workflow
+## Krok 3 - Konfiguracja Wyzwalacza Między Przepływami
+
+### 3.1 Modyfikacja cd-acr.yml
+
+Zmodyfikuj plik `.github/workflows/cd-acr.yml`, aby dodać wyzwalacz dla przepływu wdrażania na Kubernetes po pomyślnym zbudowaniu obrazu Docker w ACR:
+
+```yaml   
+      - name: Trigger Kubernetes deployment workflow
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'cd-kubernetes.yml',
+              ref: 'main',
+              inputs: {
+                image_tag: '${{ env.SHA }}-${{ env.DATE }}'
+              }
+            })
+```
+
+> **💡 Uwaga:** Upewnij się, że w ustawieniach repozytorium (Settings > Actions > General > Workflow permissions) masz włączone "Read and write permissions".
+
+### 3.2 Tworzenie Workflow Deployment
 
 Utwórz nowy branch:
 
@@ -100,11 +129,11 @@ Utwórz plik `.github/workflows/cd-kubernetes.yml` z poniższą zawartością:
 name: CD Kubernetes Deployment
 
 on:
-  pull_request:
-    branches: [ main ]
-  push:
-    branches: [ main ]
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag obrazu Docker do wdrożenia'
+        required: true
 
 env:
   APP_NAME: weather-app
@@ -115,83 +144,30 @@ env:
 permissions:
   id-token: write
   contents: read
-  actions: read
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Image
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.image-tag.outputs.tag }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get metadata
-        id: meta
-        run: |
-          echo "sha_short=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
-          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-          
-      - name: Set image tag
-        id: image-tag
-        run: echo "tag=${{ env.REGISTRY_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.meta.outputs.sha_short }}-${{ steps.meta.outputs.date }}" >> $GITHUB_OUTPUT
-          
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-          
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-          
-      - name: Login to ACR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY_NAME }}.azurecr.io
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-          
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.image-tag.outputs.tag }}
-
-      - name: Store image name
-        run: |
-          echo "${{ steps.image-tag.outputs.tag }}" >> tag.txt
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tag
-          path: tag.txt
-          retention-days: 1
-
   deploy-to-kubernetes:
     name: Deploy to Kubernetes
-    needs: build-and-push
     runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tag
-          path: .
         
-      - name: Read image tag
+      - name: Set image tag from input
         id: image-tag
-        run: echo "IMAGE_TAG=$(cat tag.txt)" >> $GITHUB_OUTPUT
+        run: echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
         
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           
       - name: Get AKS credentials
         uses: azure/aks-set-context@v3
@@ -210,25 +186,29 @@ jobs:
           manifests: |
             infra/weather_app_manifests/deployment.yaml
           images: |
-            ${{ steps.image-tag.outputs.IMAGE_TAG }}
+            ${{ vars.ACR_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.image-tag.outputs.IMAGE_TAG }}
           
       - name: Verify deployment
         run: |
           kubectl get pods,svc,ingress -n weather-app
 ```
 
-## Krok 4 - Testowanie Workflow
+> **💡 Uwaga:** Ten workflow jest uruchamiany automatycznie przez workflow budowania obrazu (`cd-acr.yml`). Możesz również uruchomić go ręcznie z zakładki Actions, podając tag obrazu do wdrożenia.
+
+## Krok 4 - Testowanie Flow Wdrażania
 
 1. Wykonaj commit i push zmian:
 ```bash
 git add .
-git commit -m "Dodaj workflow wdrożenia na Kubernetes"
+git commit -m "Add Kubernetes deployment workflow with automated trigger"
 git push --set-upstream origin k8s-deployment
 ```
 
 2. Utwórz Pull Request i przeprowadź merge do main
-3. Przejdź do zakładki Actions w GitHub, aby monitorować postęp wdrożenia
-4. Po zakończeniu wdrożenia, sprawdź status zasobów w klastrze Kubernetes:
+3. Przepływ `cd-acr.yml` powinien się uruchomić, zbudować i opublikować obraz Docker w ACR
+4. Po pomyślnym zakończeniu, automatycznie powinien uruchomić się przepływ `cd-kubernetes.yml`
+5. Obserwuj oba przepływy w zakładce Actions na GitHub
+6. Po zakończeniu wdrożenia, sprawdź status zasobów w klastrze Kubernetes:
 
 ```bash
 kubectl get pods,svc,ing -n weather-app
@@ -318,25 +298,21 @@ kubectl -n weather-app scale deployment weather-app blue --replicas=0
 
 ## Szczegóły Implementacji
 
-### Struktura Workflow
+Pipeline CI/CD składa się z dwóch oddzielnych workflow:
 
-Workflow składa się z trzech głównych jobów:
-
-1. **build-and-push**:
+1. **cd-acr.yml** (Build i Publikacja):
    - Buduje aplikację NodeJS
    - Uruchamia testy
-   - Generuje artefakt budowania
    - Buduje obraz Docker
    - Taguje go z użyciem 8-znakowego hasha commita i daty (YYYY-MM-DD)
    - Publikuje obraz w Azure Container Registry
-   - Wykorzystuje cache dla przyspieszenia budowania
+   - Wyzwala workflow wdrożenia na Kubernetes
 
-2. **deploy-to-kubernetes**:
-   - Tworzy przestrzeń nazw (namespace) w Kubernetes
-   - Tworzy sekret dla klucza API
-   - Generuje pliki manifestów Kubernetes:
-     - Deployment z konfiguracją zasobów i sondami healthcheck
-     - Service typu ClusterIP
+2. **cd-kubernetes.yml** (Deployment):
+   - Przyjmuje tag obrazu jako parametr wejściowy
+   - Loguje się do Azure i uzyskuje dostęp do klastra AKS
+   - Wdraża aplikację na Kubernetes używając określonego obrazu
+   - WerIP
      - Ingress dla dostępu zewnętrznego
    - Wdraża aplikację i weryfikuje status wdrożenia
 
@@ -361,38 +337,26 @@ Workflow składa się z trzech głównych jobów:
 
 ## Diagram Workflow
 
+```Kompletny Diagram Przepływu CI/CD
+
 ```mermaid
 graph TD
-    A[Workflow: CD Kubernetes] --> B[Job: build-and-push]
-    A --> D[Job: deploy-to-kubernetes]
+    A[Push do main] --> B[Workflow: CD ACR - Build & Push]
+    B --> C[Build i publikacja obrazu Docker]
+    C --> D[Trigger workflow_dispatch]
+    D --> E[Workflow: CD Kubernetes Deployment]
+    E --> F[Pobierz credentials AKS]
+    F --> G[Wdrożenie na Kubernetes]
+    G --> H[Weryfikacja wdrożenia]
     
-    B --> B1[Checkout code]
-    B --> B2[Setup Node.js]
-    B --> B3[Install Dependencies]
-    B --> B4[Run Tests]
-    B --> B5[Build Application]
-    B --> B6[Get metadata]
-    B --> B7[Set image tag]
-    B --> B8[Login to Azure]
-    B --> B9[Setup Docker Buildx]
-    B --> B10[Login to ACR]
-    B --> B11[Build and Push Docker Image]
-  
-    D --> D1[Checkout code]
-    D --> D2[Login to Azure]
-    D --> D3[Get AKS credentials]
-    D --> D4[Apply namespace]
-    D --> D5[Create Secret for API Key]
-    D --> D6[Set image in deployment manifest]
-    D --> D7[Deploy to Kubernetes]
-    D --> D8[Verify deployment]
-    
-    style A fill:#347d39,stroke:#347d39,color:#ffffff
+    style A fill:#f9f,stroke:#333,stroke-width:2px
     style B fill:#347d39,stroke:#347d39,color:#ffffff
-    style D fill:#347d39,stroke:#347d39,color:#ffffff
-    style D8 fill:#ff9900,stroke:#ff9900,color:#ffffff
-```
-
+    style C fill:#ffffff,stroke:#30363d
+    style D fill:#ff9900,stroke:#ff9900,color:#ffffff
+    style E fill:#347d39,stroke:#347d39,color:#ffffff
+    style F fill:#ffffff,stroke:#30363d
+    style G fill:#ffffff,stroke:#30363d
+    style H
 ## Najczęstsze Problemy
 
 1. **Problem z poświadczeniami**: Upewnij się, że Service Principal ma odpowiednie uprawnienia do ACR i AKS.
