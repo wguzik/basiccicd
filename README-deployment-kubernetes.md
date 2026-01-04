@@ -32,26 +32,18 @@ az aks get-credentials --name $AKS_NAME --resource-group $RG_NAME
 kubectl get nodes
 ```
 
-## Krok 1 - Konfiguracja Poświadczeń Azure w GitHub
+## Krok 1 - Połącz GitHub ze swoją subskrypcją i nadaj odpowiednie role
 
-1. Utwórz Service Principal z dostępem do ACR i AKS:
+### 1.1 Identity
 
-> Te poświadczenia dostaniesz od prowadzącego!
+Wykonaj kroki z [README-github-azure-auth-simple](./README-github-azure-auth-simple.md).
 
-```bash
-az ad sp create-for-rbac --name "github-actions-sp" --role contributor \
-                         --scopes /subscriptions/<ID-SUBSKRYPCJI>/resourceGroups/<NAZWA-RESOURCE-GROUP>
-```
+### 1.2 Detale Azure
 
-1. Przejdź do swojego repozytorium na GitHub
-2. Nawiguj do Settings > Secrets and variables > Actions
-3. Dodaj nowe sekrety:
-   - `AZURE_CREDENTIALS`: Dane JSON z poprzedniego kroku
-   - `WEATHER_API_KEY`: Klucz API dla aplikacji pogodowej
-   - `ACR_USERNAME`: Zawartość `Username`, które znajdziesz na poziomie ACR > Settings > Access keys
-   - `ACR_PASSWORD`: Zawartość `password`, które znajdziesz na poziomie ACR > Settings > Access keys
+2. Przejdź do swojego repozytorium na GitHub
+3. Nawiguj do Settings > Secrets and variables > Actions
 4. Dodaj nowe zmienne:
-   - `AZURE_REGISTRY_NAME`: Nazwa rejestru kontenerów (bez .azurecr.io)
+   - `ACR_NAME`: Nazwa rejestru kontenerów (bez .azurecr.io)
    - `AZURE_CLUSTER_NAME`: Nazwa klastra AKS
    - `AZURE_RESOURCE_GROUP`: Nazwa grupy zasobów
 
@@ -72,6 +64,11 @@ az aks update --name $AKS_NAME --resource-group $RG_NAME --attach-acr $ACR_NAME
 ```
 
 ### 2.2 Wdróż zasoby Kubernetes
+
+```bash
+# Zamień REPLACEME na wartość ACR_NAME we wszystkich manifestach
+sed -i "s/REPLACEME/$ACR_NAME/g" infra/weather_app_manifests/*.yaml
+```
 
 Zamiast aplikować każdy manifest osobno, użyj pojedynczej komendy dla całego katalogu:
 
@@ -111,7 +108,7 @@ on:
 
 env:
   APP_NAME: weather-app
-  REGISTRY_NAME: ${{ vars.AZURE_REGISTRY_NAME }}
+  REGISTRY_NAME: ${{ vars.ACR_NAME }}
   CLUSTER_NAME: ${{ vars.AZURE_CLUSTER_NAME }}
   RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
 

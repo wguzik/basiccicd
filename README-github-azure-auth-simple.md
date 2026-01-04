@@ -12,11 +12,11 @@
 Celem jest skonfigurowanie bezpiecznego uwierzytelniania między GitHub Actions a Azure przy użyciu **User-Assigned Managed Identity** z federated credentials (OIDC).
 
 Ta metoda:
-- ✅ Eliminuje potrzebę przechowywania sekretów (haseł) w GitHub
-- ✅ Jest zarządzana jako zwykły zasób Azure (widoczna w resource group)
-- ✅ Nie wymaga uprawnień do Azure AD
-- ✅ Automatycznie rotuje tokeny
-- ✅ Zgodna z Zero Trust security
+- Eliminuje potrzebę przechowywania sekretów (haseł) w GitHub
+- Jest zarządzana jako zwykły zasób Azure (widoczna w resource group)
+- Nie wymaga uprawnień do Azure AD
+- Automatycznie rotuje tokeny
+- Zgodna z Zero Trust security
 
 ## Krok 0 - Przygotowanie
 
@@ -99,6 +99,18 @@ az identity federated-credential create \
   --resource-group $RESOURCE_GROUP \
   --issuer "https://token.actions.githubusercontent.com" \
   --subject "repo:$GITHUB_ORG/$GITHUB_REPO:ref:refs/heads/main" \
+  --audiences "api://AzureADTokenExchange"
+```
+
+   **Alternatywnie:** Aby zezwolić na **wszystkie gałęzie**, użyj wildcarda:
+
+```bash
+az identity federated-credential create \
+  --name "github-all-branches" \
+  --identity-name $IDENTITY_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --issuer "https://token.actions.githubusercontent.com" \
+  --subject "repo:$GITHUB_ORG/$GITHUB_REPO:ref:refs/heads/*" \
   --audiences "api://AzureADTokenExchange"
 ```
 

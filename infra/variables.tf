@@ -45,7 +45,7 @@ variable "webapp_sku" {
 variable "aks_node_count" {
   description = "Number of nodes in AKS cluster"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "aks_node_size" {

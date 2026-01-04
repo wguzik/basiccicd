@@ -28,7 +28,6 @@ Wykonaj fork tego repozytorium (przycisk "Fork" w prawym górnym rogu).
 
 Sklonuj repozytorium na swój komputer lub cloud shell.
 
-> Jeżeli już posiadasz fork tego repozytorium dla innego zadania, możesz nowemu nadać nową nazwę, np. `basiccicd-artefakty`.
 
 ```bash
 git clone https://github.com/your-username/basiccicd
@@ -60,28 +59,15 @@ terraform plan
 terraform apply
 ```
 
-1. Po wdrożeniu, pobierz dane uwierzytelniające ACR:
+1. Po wdrożeniu, pobierz nazwę ACR:
 
 ```bash
 # Pobierz nazwę ACR z outputów Terraform
 ACR_NAME=$(terraform output -raw acr_name)
 
-# Pobierz login server
-ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --query loginServer -o tsv)
-
-# Pobierz username (to samo co nazwa ACR)
-ACR_USERNAME=$ACR_NAME
-
-# Pobierz hasło
-ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
-
-# Wyświetl dane (zapisz je bezpiecznie!)
-echo "ACR Login Server: $ACR_LOGIN_SERVER"
-echo "ACR Username: $ACR_USERNAME"
-echo "ACR Password: $ACR_PASSWORD"
+# Wyświetl nazwę ACR
+echo "ACR Name: $ACR_NAME"
 ```
-
-**UWAGA:** Hasło do ACR jest wrażliwe - nigdy nie commituj go do repozytorium!
 
 1. Wróć do głównego katalogu projektu:
 
@@ -89,31 +75,29 @@ echo "ACR Password: $ACR_PASSWORD"
 cd ..
 ```
 
-## Krok 2 - Konfiguracja Sekretów GitHub
+## Krok 2 - Konfiguracja Uwierzytelniania GitHub z Azure
 
-Dodaj dane uwierzytelniające Azure Container Registry do GitHub Secrets:
+Skonfiguruj bezpieczne uwierzytelnianie GitHub Actions z Azure używając Managed Identity z OIDC:
 
-1. Przejdź do swojego repozytorium na GitHub
-2. Nawiguj do Settings > Secrets and variables > Actions
-3. Dodaj nowe sekrety repozytorium:
-   - `ACR_USERNAME`: Nazwa Azure Container Registry (pobrana w poprzednim kroku)
-   - `ACR_PASSWORD`: Hasło pobrane z Azure (z poprzedniego kroku)
-   - `ACR_LOGIN_SERVER`: Login server ACR (np. `myproject-dev-acr.azurecr.io`)
+1. Postępuj zgodnie z instrukcjami w [README-github-azure-auth-simple.md](README-github-azure-auth-simple.md)
+2. Upewnij się, że Managed Identity ma przypisaną rolę `AcrPush` dla Twojego ACR (opisane w Kroku 3 dokumentu)
+3. Dodaj wymagane sekrety w GitHub (opisane w Kroku 4 dokumentu):
+   - `AZURE_CLIENT_ID`
+   - `AZURE_TENANT_ID`
+   - `AZURE_SUBSCRIPTION_ID`
 
 ## Krok 3 - Konfiguracja Zmiennych Środowiskowych GitHub
 
-Dodaj zmienną środowiskową dla nazwy obrazu:
+Dodaj zmienne środowiskowe dla ACR i nazwy obrazu:
 
 1. Przejdź do swojego repozytorium na GitHub
 2. Nawiguj do Settings > Secrets and variables > Actions
 3. Przejdź do zakładki "Variables"
-4. Kliknij "New repository variable"
-5. Dodaj nową zmienną:
-   - Name: `IMAGE_NAME`
-   - Value: nazwa-obrazu (np. "weather-app")
-   - Kliknij "Add variable"
+4. Dodaj następujące zmienne:
+   - Name: `ACR_NAME`, Value: nazwa ACR bez `.azurecr.io` (np. "myprojectdevacr")
+   - Name: `IMAGE_NAME`, Value: nazwa obrazu (np. "weather-app")
 
-Ta zmienna będzie używana w workflow do określenia nazwy obrazu w ACR.
+Te zmienne będą używane w workflow do określenia lokalizacji obrazu w ACR.
 
 ## Krok 4 - Tworzenie Workflow
 
@@ -136,11 +120,14 @@ git push
 ### 4.1 Dodaj trigger
 
 ```yaml
-name: Container image build and push to ACR
+name: Build and push to ACR
 
 on:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:
 ```
 
 ### 4.2 Dodaj Job Budowania Docker
@@ -156,21 +143,30 @@ Sekcja poniżej odpowiada za logowanie się do ACR oraz uruchomienie buildu. Zau
 ```yaml
 jobs:
   docker:
-    name: Build and Push Docker Image to ACR
+    name: Build and Push Image to ACR
     runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write  # Wymagane dla OIDC
+      contents: read
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Azure Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          az acr login --name ${{ vars.ACR_NAME }}
 ```
 
 Sekcja poniżej odpowiada za wygenerowanie taga, składającego się z fragmentu commit hasha i bieżącej daty.
@@ -187,14 +183,16 @@ Sekcja poniżej odpowiada za wygenerowanie taga, składającego się z fragmentu
         with:
           context: .
           push: true
-          tags: ${{ secrets.ACR_LOGIN_SERVER }}/${{ vars.IMAGE_NAME }}:${{ env.SHA }}-${{ env.DATE }}
+          tags: ${{ vars.ACR_NAME }}.azurecr.io/${{ vars.IMAGE_NAME }}:${{ env.SHA }}-${{ env.DATE }}
 ```
 
 **Wyjaśnienie:**
 
-- `ACR_LOGIN_SERVER` - adres rejestru ACR (np. `myproject-dev-acr.azurecr.io`)
-- `IMAGE_NAME` - nazwa obrazu (np. `weather-app`)
-- Tag: `{ACR_LOGIN_SERVER}/{IMAGE_NAME}:{SHA}-{DATE}` (np. `myproject-dev-acr.azurecr.io/weather-app:a1b2c3d4-2026-01-03`)
+- `ACR_NAME` - nazwa rejestru ACR (np. `myprojectdevacr`), dodana jako GitHub Variable
+- `IMAGE_NAME` - nazwa obrazu (np. `weather-app`), dodana jako GitHub Variable
+- Tag: `{ACR_NAME}.azurecr.io/{IMAGE_NAME}:{SHA}-{DATE}` (np. `myprojectdevacr.azurecr.io/weather-app:a1b2c3d4-2026-01-03`)
+
+> **💡 Bezpieczeństwo:** Ten workflow używa Managed Identity z OIDC zamiast haseł, co jest zgodne z najlepszymi praktykami Zero Trust.
 
 ## Krok 5 - Testowanie Workflow
 
