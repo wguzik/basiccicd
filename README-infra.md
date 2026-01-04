@@ -31,7 +31,7 @@ git clone https://github.com/wguzik/basicicd.git
 
 Podstawowym narzędziem do edycji kodu jest wbudowany w `VS Code` w Cloud Shell, który można uruchomić za pomocą polecenia `code`.
 
-Zaloguj się do Azure CLI:
+Jeżeli pracujesz lokalnie, zaloguj się do Azure.
 
 ```bash
 az login
