@@ -24,7 +24,7 @@ Nawiguj w przeglądarce do [portal.azure.com](https://portal.azure.com), uruchom
 Oficjalna dokumentacja: [Cloud Shell Quickstart](https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/cloud-shell/quickstart.md).
 
 ```bash
-git clone https://github.com/wguzik/basicicd.git
+git clone https://github.com/wguzik/basiccicd.git
 ```
 
 > Poniższe kroki realizuje się za pomocą Cloud Shell.
@@ -42,7 +42,7 @@ az login
 1. Utwórz plik `terraform.tfvars` w katalogu `infra`:
 
 ```bash
-cd infra
+cd cd basiccicd/infra/
 cp terraform.tfvars.example terraform.tfvars
 ```
 
@@ -51,7 +51,13 @@ cp terraform.tfvars.example terraform.tfvars
 az account show
 ```
 
-Uzupełnij zmienne:
+Uruchom VS Code w trybie edycji:
+
+```bash
+code .
+```
+
+Otwórz plik `terraform.tfvars` i uzupełnij zmienne:
 
 ```hcl
 subscription_id = "<ID_SUBSKRYPCJI>"

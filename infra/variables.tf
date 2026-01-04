@@ -27,7 +27,7 @@ variable "location" {
 variable "keyvault_sku" {
   description = "SKU name for Key Vault"
   type        = string
-  default     = "basic"
+  default     = "standard"
 }
 
 variable "acr_sku" {
