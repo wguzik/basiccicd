@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: weather-app-gitops
+  namespace: argocd
+  # Finalizer zapewnia cleanup przy usuwaniu aplikacji
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Projekt (default dla basic setup)
+  project: default
+  
+  # Źródło - repozytorium Git
+  source:
+    # UWAGA: Zmień na URL swojego forka!
+    repoURL: https://github.com/TWOJ-USERNAME/basiccicd.git
+    targetRevision: main
+    path: infra/weather_app_manifests
+    
+    # Directory - deploy wszystkich YAML w katalogu
+    directory:
+      recurse: false
+      include: '{namespace,deployment,service,ingress}.yaml'
+  
+  # Destination - gdzie wdrożyć
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: weather-app
+  
+  # Sync policy - automatyczna synchronizacja
+  syncPolicy:
+    automated:
+      # Automatyczny deployment przy zmianach w Git
+      prune: true        # Usuń zasoby nieobecne w Git
+      selfHeal: true     # Cofnij manualne zmiany w klastrze
+      allowEmpty: false  # Nie pozwól na pusty deployment
+    
+    syncOptions:
+      - CreateNamespace=true  # Utwórz namespace jeśli nie istnieje
+      - PruneLast=true        # Usuń zasoby na końcu (bezpieczniejsze)
+    
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

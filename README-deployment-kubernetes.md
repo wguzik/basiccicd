@@ -297,13 +297,46 @@ kubectl patch service weather-app-blue-green -n weather-app -p '{"spec":{"select
 - zeskaluj pody blue
 
 ```bash
-kubectl -n weather-app scale deployment weather-app blue --replicas=0
+kubectl -n weather-app scale deployment weather-app-blue --replicas=0
 ```
 
 ## Krok 8 - Zasymuluj canary deployment
 
-- wskaż na service zarówno blue, jak i green
-- zeskaluj liczbę podów w green do 1, a w blue wyskaluj do 4
+zeskaluj do zera oryginalny deployment i usun ingress:
+
+```bash
+kubectl -n weather-app scale deployment weather-app --replicas=0
+
+kubectl delete -f infra/weather_app_manifests_green/ingress-blue-green.yaml
+kubectl delete -f infra/weather_app_manifests_green/ingress-green-test.yaml
+```
+
+Przełącz service, aby wskazywał na oba wdrożenia (blue i green):
+
+```bash
+# Zaktualizuj selector service, aby wskazywał na app=weather-app (bez wersji)
+kubectl patch service weather-app-blue-green -n weather-app -p '{"spec":{"selector":{"app":"weather-app"}}}'
+```
+
+Zeskaluj liczbę podów - green do 1 (20% ruchu), blue do 4 (80% ruchu):
+
+```bash
+# Zeskaluj green deployment do 1 repliki (canary)
+kubectl -n weather-app scale deployment weather-app-green --replicas=1
+
+# Zeskaluj blue deployment do 4 replik (stable)
+kubectl -n weather-app scale deployment weather-app-blue --replicas=4
+```
+
+Sprawdź dystrybucję podów:
+
+```bash
+kubectl get pods -n weather-app -l app=weather-app --show-labels
+```
+
+Dzięki temu service będzie routował ~20% ruchu do green (1 pod) i ~80% do blue (4 pody).
+
+Odśwież kilkukrotnie stronę.
 
 ## Szczegóły Implementacji
 

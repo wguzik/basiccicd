@@ -59,6 +59,8 @@ W ramach tego modułu:
 
 ---
 
+## Część 0: USUŃ AUTOMATYCZNE WDROŻENIE NA KUBERNETES Z JOBA CD-ACR!
+
 ## Część 1: Instalacja Managed Argo CD (~45 minut)
 
 ### Krok 1.1 - Przygotowanie zmiennych środowiskowych
@@ -77,6 +79,23 @@ export SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
 # Weryfikacja klastra (powinien być już dostępny z poprzedniego modułu)
 az aks show --name $AKS_NAME --resource-group $RG_NAME --query "name"
+
+# Sprawdź czy masz już credentials
+kubectl get nodes
+```
+
+**PowerShell:**
+```powershell
+# Użyj wartości z Terraform outputs lub GitHub Variables
+cd infra
+$env:RG_NAME = terraform output -raw resource_group_name
+$env:AKS_NAME = terraform output -raw aks_cluster_name
+$env:ACR_NAME = terraform output -raw acr_name
+$env:LOCATION = terraform output -raw location
+$env:SUBSCRIPTION_ID = az account show --query id -o tsv
+
+# Weryfikacja klastra
+az aks show --name $env:AKS_NAME --resource-group $env:RG_NAME --query "name"
 
 # Sprawdź czy masz już credentials
 kubectl get nodes
@@ -149,7 +168,7 @@ az k8s-extension create \
 
 ```bash
 # Credentials do klastra powinny już być skonfigurowane z poprzedniego modułu
-# Ale możesz odświeżyć je jeśli potrzeba:
+# Ale możesz je odświeżyć jeśli potrzeba:
 az aks get-credentials --name $AKS_NAME --resource-group $RG_NAME --overwrite-existing
 
 # Sprawdź czy pody Argo CD zostały uruchomione
@@ -175,30 +194,11 @@ argocd-repo-server-xxx                              1/1     Running   0         
 argocd-server-xxx                                   1/1     Running   0          2m
 ```
 
-### Krok 1.6 - Ekspozycja interfejsu Argo CD
+### Krok 1.6 - Ekspozycja interfejsu Argo CD (tylko lokalnie!)
 
-Utwórz LoadBalancer service dla dostępu do UI:
-
-```bash
-kubectl -n argocd expose service argocd-server \
-  --type LoadBalancer \
-  --name argocd-server-lb \
-  --port 80 \
-  --target-port 8080
-```
-
-Poczekaj na przydzielenie publicznego IP:
 
 ```bash
-# Sprawdź External IP (może zająć 1-2 minuty)
-kubectl get svc -n argocd argocd-server-lb -w
-```
-
-Zapisz External IP:
-
-```bash
-export ARGOCD_SERVER_IP=$(kubectl get svc -n argocd argocd-server-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-echo "Argo CD UI: http://$ARGOCD_SERVER_IP"
+kubectl -n argocd port-forward svc/argocd-server 8081:80
 ```
 
 ### Krok 1.7 - Logowanie do Argo CD UI
@@ -212,7 +212,7 @@ echo ""
 ```
 
 Zaloguj się do UI:
-- URL: `http://<ARGOCD_SERVER_IP>`
+- URL: `http://localhost:8081`
 - Username: `admin`
 - Password: `<hasło z poprzedniego kroku>`
 
@@ -241,8 +241,6 @@ git push origin main
 Utwórz plik `.github/argocd/weather-app.yaml` z definicją aplikacji:
 
 ```bash
-mkdir -p .github/argocd
-cat <<'EOF' > .github/argocd/weather-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -259,7 +257,7 @@ spec:
   source:
     # UWAGA: Zmień na URL swojego forka!
     repoURL: https://github.com/TWOJ-USERNAME/basiccicd.git
-    targetRevision: main
+    targetRevision: main #branch!
     path: infra/weather_app_manifests
     
     # Directory - deploy wszystkich YAML w katalogu
@@ -290,34 +288,10 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
-EOF
 ```
 
 **WAŻNE:** Zmień `repoURL` na URL swojego forka repozytorium!
 
-### Krok 2.3 - Konfiguracja Secrets
-
-> **Uwaga:** Namespace `weather-app` i secret powinny już istnieć z poprzedniego modułu deployment-kubernetes. Sprawdź czy istnieją przed utworzeniem.
-
-```bash
-# Sprawdź czy namespace już istnieje
-kubectl get namespace weather-app
-
-# Sprawdź czy secret już istnieje
-kubectl get secret weather-api-secret -n weather-app
-
-# Jeśli nie istnieją, utwórz je:
-# Ustaw zmienną z kluczem API (możesz pobrać z GitHub Secrets)
-export WEATHER_API_KEY="<twoj-klucz-api>"
-
-# Utwórz namespace
-kubectl create namespace weather-app --dry-run=client -o yaml | kubectl apply -f -
-
-# Utwórz secret
-kubectl create secret generic weather-api-secret \
-  --from-literal=WEATHER_API_KEY=$WEATHER_API_KEY \
-  -n weather-app
-```
 
 ### Krok 2.4 - Wdrożenie aplikacji przez Argo CD
 
@@ -334,7 +308,7 @@ kubectl describe application weather-app-gitops -n argocd
 
 ### Krok 2.5 - Monitorowanie wdrożenia w UI
 
-1. Odśwież Argo CD UI (`http://<ARGOCD_SERVER_IP>`)
+1. Odśwież Argo CD UI (`<http://localhost:8081>`)
 2. Zobaczysz aplikację `weather-app-gitops`
 3. Kliknij na aplikację aby zobaczyć:
    - Topology view (wizualizacja zasobów)
@@ -355,7 +329,7 @@ kubectl get svc -n weather-app
 kubectl get ingress -n weather-app
 
 # Pobierz External IP aplikacji
-kubectl get ingress -n weather-app weather-app-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+kubectl get ingress -n weather-app weather-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
 Przetestuj aplikację w przeglądarce: `http://<INGRESS-IP>`
@@ -367,6 +341,17 @@ Przetestujmy GitOps w akcji:
 ```bash
 # Zmień liczbę replik w deployment
 sed -i '' 's/replicas: 2/replicas: 3/' infra/weather_app_manifests/deployment.yaml
+
+# Commit i push
+git add infra/weather_app_manifests/deployment.yaml
+git commit -m "Scale weather app to 3 replicas"
+git push origin main
+```
+
+**PowerShell:**
+```powershell
+# Zmień liczbę replik w deployment
+(Get-Content infra\weather_app_manifests\deployment.yaml) -replace 'replicas: 2', 'replicas: 3' | Set-Content infra\weather_app_manifests\deployment.yaml
 
 # Commit i push
 git add infra/weather_app_manifests/deployment.yaml
@@ -407,7 +392,7 @@ W ciągu 5 minut Argo CD wykryje drift i przywróci stan z Git (3 repliki).
 Przetestujmy kompletny przepływ GitOps, który łączy CI/CD pipeline z automatycznym wdrożeniem:
 
 **Przepływ:**
-1. Zmiana kodu aplikacji (zmiana koloru tła)
+1. Zmiana kodu aplikacji (zmiana tytułu strony)
 2. Push do Git → GitHub Actions buduje nowy obraz w ACR
 3. Aktualizacja manifestu Kubernetes z nowym tagiem obrazu
 4. Argo CD automatycznie wykrywa zmianę i wdraża nową wersję
@@ -416,25 +401,49 @@ Przetestujmy kompletny przepływ GitOps, który łączy CI/CD pipeline z automat
 
 ```bash
 # Utwórz nowy branch dla zmiany
-git checkout -b feature/blue-background
+git checkout -b feature/gitops-title
 
-# Zmień kolor tła na niebieski
-cp public/styles-blue.css public/styles.css
+# Zmień tytuł w pliku index.html z "Weather App" na "Weather-App GitOps"
+sed -i 's/<h1>Weather App<\/h1>/<h1>Weather-App GitOps<\/h1>/' public/index.html
+sed -i 's/<title>Weather App<\/title>/<title>Weather-App GitOps<\/title>/' public/index.html
 
 # Commit i push - to uruchomi workflow cd-kubernetes
+git add public/index.html
+
+cp public/styles-green.css public/styles.css
+
 git add public/styles.css
-git commit -m "Change background to blue"
-git push origin feature/blue-background
+
+git commit -m "Update app title to Weather-App GitOps and new colours"
+git push origin feature/gitops-title
+```
+
+**PowerShell:**
+```powershell
+# Utwórz nowy branch dla zmiany
+git checkout -b feature/gitops-title
+
+# Zmień tytuł w pliku index.html z "Weather App" na "Weather-App GitOps"
+(Get-Content public\index.html) -replace '<h1>Weather App</h1>', '<h1>Weather-App GitOps</h1>' -replace '<title>Weather App</title>', '<title>Weather-App GitOps</title>' | Set-Content public\index.html
+
+# Commit i push - to uruchomi workflow cd-kubernetes
+git add public/index.html
+
+Copy-Item public\styles-green.css public\styles.css
+
+git add public/styles.css
+
+git commit -m "Update app title to Weather-App GitOps and new colours"
+git push origin feature/gitops-title
 ```
 
 #### 2.9.2 Monitorowanie budowania obrazu
 
 1. Utwórz Pull Request w GitHub
-2. Przejdź do Actions → workflow `CD Kubernetes Deployment` się uruchomi
-3. **Ważne:** Pozwól dokończyć job `build-and-push`, ale **przerwij** job `deploy-to-kubernetes` (nie potrzebujemy starego sposobu deploymentu)
-4. Z logów job'a `build-and-push` skopiuj tag obrazu, np:
+2. Przejdź do Actions → workflow `Container image build and push to ACR`
+4. Z logów joba skopiuj tag obrazu, np:
    ```
-   tag=myregistry.azurecr.io/weather-app:abc12345-2025-12-31
+   tag=myregistry.azurecr.io/weather-app:abc12345-2026-01-06
    ```
 
 Alternatywnie, możesz pobrać tag z ACR:
@@ -447,20 +456,44 @@ cd ..
 az acr repository show-tags --name $ACR_NAME --repository weather-app --orderby time_desc --top 1
 ```
 
+**PowerShell:**
+```powershell
+# Pobierz najnowszy tag z ACR
+cd infra
+$env:ACR_NAME = terraform output -raw acr_name
+cd ..
+
+az acr repository show-tags --name $env:ACR_NAME --repository weather-app --orderby time_desc --top 1
+```
+
 #### 2.9.3 Aktualizacja manifestu dla Argo CD
 
 Zaktualizuj manifest deploymentu z nowym obrazem:
 
 ```bash
 # Upewnij się, że jesteś na swoim branchu feature
-git checkout feature/blue-background
+git checkout feature/gitops-title
 
 # Otwórz plik deployment i zmień image tag
 # Znajdź linię z "image:" i podmień na nowy tag
 export NEW_IMAGE_TAG="<your-acr>.azurecr.io/weather-app:<commit-hash>-<date>"
 
-# Użyj sed do aktualizacji (macOS)
+# Użyj sed do aktualizacji
 sed -i '' "s|image:.*|image: $NEW_IMAGE_TAG|g" infra/weather_app_manifests/deployment.yaml
+
+# Lub ręcznie edytuj plik w edytorze
+```
+
+**PowerShell:**
+```powershell
+# Upewnij się, że jesteś na swoim branchu feature
+git checkout feature/gitops-title
+
+# Otwórz plik deployment i zmień image tag
+$NEW_IMAGE_TAG = "<your-acr>.azurecr.io/weather-app:<commit-hash>-<date>"
+
+# Użyj PowerShell do aktualizacji
+(Get-Content infra\weather_app_manifests\deployment.yaml) -replace 'image:.*', "image: $NEW_IMAGE_TAG" | Set-Content infra\weather_app_manifests\deployment.yaml
 
 # Lub ręcznie edytuj plik w edytorze
 ```
@@ -475,13 +508,9 @@ git diff infra/weather_app_manifests/deployment.yaml
 ```bash
 # Commit aktualizacji manifestu
 git add infra/weather_app_manifests/deployment.yaml
-git commit -m "Update image tag to blue version: $NEW_IMAGE_TAG"
-git push origin feature/blue-background
+git commit -m "Update image tag to GitOps version: $NEW_IMAGE_TAG"
+git push origin feature/gitops-title
 
-# Merge do main (przez PR lub bezpośrednio)
-git checkout main
-git merge feature/blue-background
-git push origin main
 ```
 
 #### 2.9.5 Obserwowanie automatycznego wdrożenia przez Argo CD
@@ -496,12 +525,12 @@ kubectl get applications -n argocd -w
 kubectl get pods -n weather-app -w
 
 # Sprawdź w Argo CD UI
-echo "Argo CD UI: http://$ARGOCD_SERVER_IP"
+echo "Argo CD UI: http://localhost:8081"
 ```
 
 W Argo CD UI zobaczysz:
 - **Out of Sync** → **Syncing** → **Synced**
-- Nowe pody z niebieskim tłem są wdrażane
+- Nowe pody z zaktualizowanym tytułem są wdrażane
 - Stare pody są stopniowo usuwane (rolling update)
 
 #### 2.9.6 Weryfikacja nowej wersji
@@ -510,7 +539,7 @@ W Argo CD UI zobaczysz:
 # Pobierz adres Ingress
 kubectl get ingress -n weather-app weather-app-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 
-# Otwórz w przeglądarce - zobaczysz niebieskie tło!
+# Otwórz w przeglądarce - zobaczysz nowy tytuł "Weather-App GitOps"!
 ```
 
 #### 2.9.7 Automatyzacja: Image Updater (Opcjonalnie)
@@ -556,17 +585,28 @@ graph LR
 
 ### Krok 3.1 - Multi-Environment z Argo CD Projects
 
+Załóż nowy branch:
+
+```bash
+git checkout -b "feat/gitops-multienvs"
+```
+
 Utwórz strukturę dla wielu środowisk:
 
 ```bash
 mkdir -p .github/argocd/environments/{dev,staging,prod}
 ```
 
-Utwórz Argo CD Projects dla separacji środowisk:
+**PowerShell:**
+```powershell
+New-Item -ItemType Directory -Force -Path .github\argocd\environments\dev
+New-Item -ItemType Directory -Force -Path .github\argocd\environments\staging
+New-Item -ItemType Directory -Force -Path .github\argocd\environments\prod
+```
 
-```bash
-cat <<'EOF' > .github/argocd/projects.yaml
----
+Utwórz Argo CD Projects dla separacji środowisk `.github/argocd/projects.yaml`:
+
+```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -625,11 +665,10 @@ spec:
       kind: '*'
   syncWindows:
     - kind: allow
-      schedule: '0 9-17 * * 1-5'  # Tylko w godzinach pracy, pon-pt
+      schedule: '0 9-17 * * 1-7'  # Tylko w godzinach pracy, pon-ndz
       duration: 8h
       applications:
         - '*'
-EOF
 ```
 
 Zastosuj projekty:
@@ -642,9 +681,10 @@ kubectl apply -f .github/argocd/projects.yaml
 
 Utwórz aplikacje dla każdego środowiska z różnymi konfiguracjami:
 
-```bash
-# DEV - automatyczna synchronizacja
-cat <<'EOF' > .github/argocd/environments/dev/weather-app.yaml
+**UWAGA:** Zmień `repoURL` na swój fork!
+
+```yaml
+# .github/argocd/environments/dev/weather-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -668,10 +708,10 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-EOF
+```
 
-# STAGING - automatyczna sync z ręcznym approval dla prod promotion
-cat <<'EOF' > .github/argocd/environments/staging/weather-app.yaml
+```yaml
+# .github/argocd/environments/staging/weather-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -695,10 +735,11 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-EOF
+```
 
+```yaml
 # PROD - manualna synchronizacja, tylko w sync windows
-cat <<'EOF' > .github/argocd/environments/prod/weather-app.yaml
+# .github/argocd/environments/prod/weather-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -720,16 +761,21 @@ spec:
     # BRAK automated - wymagana manualna synchronizacja w UI
     syncOptions:
       - CreateNamespace=true
-EOF
 ```
 
-**UWAGA:** Zmień `repoURL` na swój fork!
+```bash
+git commit -am "GitOps - wiele środowisk"
+git push
+```
+
+Stwórz Pull Request i zmerge'uj.
 
 ### Krok 3.3 - Environment Promotion Strategy
 
 Utwórz branch strategy dla promocji:
 
 ```bash
+git pull
 # DEV - ciągłe deployment z main
 # main branch -> weather-app-dev
 
@@ -750,107 +796,7 @@ kubectl apply -f .github/argocd/environments/staging/weather-app.yaml
 kubectl apply -f .github/argocd/environments/prod/weather-app.yaml
 ```
 
-### Krok 3.4 - Konfiguracja per Environment z Kustomize
-
-Utwórz overlay dla różnych środowisk:
-
-```bash
-mkdir -p infra/weather_app_overlays/{dev,staging,prod}
-```
-
-Base kustomization:
-
-```bash
-cat <<'EOF' > infra/weather_app_manifests/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - namespace.yaml
-  - deployment.yaml
-  - service.yaml
-  - ingress.yaml
-  - secret.yaml
-EOF
-```
-
-DEV overlay:
-
-```bash
-cat <<'EOF' > infra/weather_app_overlays/dev/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: weather-app-dev
-nameSuffix: -dev
-commonLabels:
-  environment: dev
-resources:
-  - ../../weather_app_manifests
-replicas:
-  - name: weather-app
-    count: 1
-images:
-  - name: weather-app
-    newTag: latest
-EOF
-```
-
-STAGING overlay:
-
-```bash
-cat <<'EOF' > infra/weather_app_overlays/staging/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: weather-app-staging
-nameSuffix: -staging
-commonLabels:
-  environment: staging
-resources:
-  - ../../weather_app_manifests
-replicas:
-  - name: weather-app
-    count: 2
-images:
-  - name: weather-app
-    newTag: staging
-EOF
-```
-
-PROD overlay:
-
-```bash
-cat <<'EOF' > infra/weather_app_overlays/prod/kustomization.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: weather-app-prod
-nameSuffix: -prod
-commonLabels:
-  environment: production
-resources:
-  - ../../weather_app_manifests
-replicas:
-  - name: weather-app
-    count: 3
-images:
-  - name: weather-app
-    newTag: v1.0.0
-configMapGenerator:
-  - name: app-config
-    literals:
-      - LOG_LEVEL=info
-      - ENVIRONMENT=production
-EOF
-```
-
-Zaktualizuj Argo CD Applications aby używały Kustomize:
-
-```bash
-# Dla każdej aplikacji zmień 'directory' na 'kustomize'
-# Przykład dla DEV:
-kubectl patch application weather-app-dev -n argocd --type='json' \
-  -p='[{"op": "replace", "path": "/spec/source/path", "value": "infra/weather_app_overlays/dev"}]'
-```
-
-### Krok 3.5 - Integracja z Private ACR (Opcjonalnie)
+### Krok 3.4 - Integracja z Private ACR (Opcjonalnie)
 
 > **Uwaga:** Azure Container Registry został już utworzony przez Terraform i podłączony do klastra AKS w poprzednim module. Ten krok jest opcjonalny jeśli chcesz dodatkowo skonfigurować workload identity dla Argo CD.
 
@@ -890,7 +836,42 @@ az k8s-extension update \
   --config "workloadIdentity.clientId=$IDENTITY_CLIENT_ID"
 ```
 
-### Krok 3.6 - Automated Rollback Configuration
+**PowerShell:**
+```powershell
+# ACR został już utworzony przez Terraform, pobierz jego nazwę
+cd infra
+$env:ACR_NAME = terraform output -raw acr_name
+cd ..
+
+# Utwórz managed identity dla Argo CD
+az identity create `
+  --name argocd-acr-identity `
+  --resource-group $env:RG_NAME
+
+# Pobierz client ID
+$env:IDENTITY_CLIENT_ID = az identity show `
+  --name argocd-acr-identity `
+  --resource-group $env:RG_NAME `
+  --query clientId -o tsv
+
+# Przypisz rolę AcrPull
+$env:ACR_ID = az acr show --name $env:ACR_NAME --resource-group $env:RG_NAME --query id -o tsv
+az role assignment create `
+  --assignee $env:IDENTITY_CLIENT_ID `
+  --role AcrPull `
+  --scope $env:ACR_ID
+
+# Zaktualizuj Argo CD extension z workload identity
+az k8s-extension update `
+  --resource-group $env:RG_NAME `
+  --cluster-name $env:AKS_NAME `
+  --cluster-type managedClusters `
+  --name argocd `
+  --config "workloadIdentity.enable=true" `
+  --config "workloadIdentity.clientId=$env:IDENTITY_CLIENT_ID"
+```
+
+### Krok 3.5 - Automated Rollback Configuration
 
 Skonfiguruj automatyczny rollback w przypadku nieudanego wdrożenia:
 
@@ -930,7 +911,7 @@ spec:
 EOF
 ```
 
-### Krok 3.7 - Monitoring i Notifications
+### Krok 3.6 - Monitoring i Notifications
 
 Skonfiguruj notyfikacje Slack/Teams dla Argo CD (opcjonalnie):
 
