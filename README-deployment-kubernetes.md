@@ -80,7 +80,7 @@ Zamiast aplikować każdy manifest osobno, użyj pojedynczej komendy dla całego
 kubectl apply -f infra/weather_app_manifests/
 ```
 
-> **💡 Wskazówka:** Komenda `kubectl apply -f <katalog>/` automatycznie aplikuje wszystkie pliki YAML w katalogu. Jest to prostsze i szybsze niż wykonywanie osobnych komend dla każdego pliku.
+> **Wskazówka:** Komenda `kubectl apply -f <katalog>/` automatycznie aplikuje wszystkie pliki YAML w katalogu. Jest to prostsze i szybsze niż wykonywanie osobnych komend dla każdego pliku.
 
 Weryfikacja wdrożenia:
 
@@ -91,7 +91,26 @@ kubectl get all -n weather-app
 
 ## Krok 3 - Konfiguracja Wyzwalacza Między Przepływami
 
-### 3.1 Modyfikacja cd-acr.yml
+Utwórz nowy branch:
+
+```bash
+git checkout -b k8s-deployment
+```
+
+### 3.1 Konfiguracja Personal Access Token (PAT)
+
+Aby umożliwić automatyczne wyzwalanie workflow deployment, musisz utworzyć Personal Access Token:
+
+1. Przejdź do GitHub > Settings (twoje konto, nie repozytorium) > Developer settings > Personal access tokens > Tokens (classic)
+2. Kliknij "Generate new token" > "Generate new token (classic)"
+3. Nadaj tokenowi nazwę, np. "Workflow Trigger Token"
+4. Ustaw expiration (np. 90 dni)
+5. Zaznacz scope: **`repo`** oraz **`workflow`**
+6. Kliknij "Generate token" i skopiuj token
+7. W swoim repozytorium przejdź do Settings > Secrets and variables > Actions > Secrets
+8. Dodaj nowy secret o nazwie `PAT_TOKEN` i wklej skopiowany token
+
+### 3.2 Modyfikacja cd-acr.yml
 
 Zmodyfikuj plik `.github/workflows/cd-acr.yml`, aby dodać wyzwalacz dla przepływu wdrażania na Kubernetes po pomyślnym zbudowaniu obrazu Docker w ACR:
 
@@ -100,7 +119,7 @@ Zmodyfikuj plik `.github/workflows/cd-acr.yml`, aby dodać wyzwalacz dla przepł
         if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
           script: |
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
@@ -113,15 +132,9 @@ Zmodyfikuj plik `.github/workflows/cd-acr.yml`, aby dodać wyzwalacz dla przepł
             })
 ```
 
-> **💡 Uwaga:** Upewnij się, że w ustawieniach repozytorium (Settings > Actions > General > Workflow permissions) masz włączone "Read and write permissions".
+> **💡 Uwaga:** Używamy `PAT_TOKEN` zamiast domyślnego `GITHUB_TOKEN`, ponieważ tylko Personal Access Token ma uprawnienia do wyzwalania innych workflow.
 
-### 3.2 Tworzenie Workflow Deployment
-
-Utwórz nowy branch:
-
-```bash
-git checkout -b k8s-deployment
-```
+### 3.3 Tworzenie Workflow Deployment
 
 Utwórz plik `.github/workflows/cd-kubernetes.yml` z poniższą zawartością:
 
@@ -187,6 +200,7 @@ jobs:
             infra/weather_app_manifests/deployment.yaml
           images: |
             ${{ vars.ACR_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.image-tag.outputs.IMAGE_TAG }}
+          pull-images: false
           
       - name: Verify deployment
         run: |
@@ -195,20 +209,21 @@ jobs:
 
 > **💡 Uwaga:** Ten workflow jest uruchamiany automatycznie przez workflow budowania obrazu (`cd-acr.yml`). Możesz również uruchomić go ręcznie z zakładki Actions, podając tag obrazu do wdrożenia.
 
-## Krok 4 - Testowanie Flow Wdrażania
+### 3.4 Commit i Push Workflow
 
-1. Wykonaj commit i push zmian:
 ```bash
-git add .
+git add .github/workflows/cd-kubernetes.yml
 git commit -m "Add Kubernetes deployment workflow with automated trigger"
 git push --set-upstream origin k8s-deployment
 ```
 
-2. Utwórz Pull Request i przeprowadź merge do main
-3. Przepływ `cd-acr.yml` powinien się uruchomić, zbudować i opublikować obraz Docker w ACR
-4. Po pomyślnym zakończeniu, automatycznie powinien uruchomić się przepływ `cd-kubernetes.yml`
-5. Obserwuj oba przepływy w zakładce Actions na GitHub
-6. Po zakończeniu wdrożenia, sprawdź status zasobów w klastrze Kubernetes:
+## Krok 4 - Testowanie Flow Wdrażania
+
+1. Utwórz Pull Request i przeprowadź merge do main
+2. Przepływ `cd-acr.yml` powinien się uruchomić, zbudować i opublikować obraz Docker w ACR
+3. Po pomyślnym zakończeniu, automatycznie powinien uruchomić się przepływ `cd-kubernetes.yml`
+4. Obserwuj oba przepływy w zakładce Actions na GitHub
+5. Po zakończeniu wdrożenia, sprawdź status zasobów w klastrze Kubernetes:
 
 ```bash
 kubectl get pods,svc,ing -n weather-app
@@ -216,7 +231,7 @@ kubectl get pods,svc,ing -n weather-app
 
 W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weather App.
 
-## Krok 5 - Przygotuj obrazy blue/green deployment
+## Krok 5 - Blue/Green Deployment (Opcjonalne)
 
 - stwórz nowy branch `k8s-blue-green`
 
@@ -244,24 +259,18 @@ W wynikach znajdziesz m.in adres IP, otwórz stronę i zobacz czy widzisz Weathe
 - Stwórz pull request. Zauważ, że zmiana spowoduje automatyczne wdrożenie na środowisko - przerwij flow zaraz po zbudowaniu obrazu
 - Pobierz nazwę obrazu green - poznasz ją po commit hash
 
-## Krok 6 - Przygotuj zasoby kubernetes pod blue/green
+## Krok 6 - Wdrożenie Blue/Green Deployments
   
- - w plikach
-    - `infra/weather_app_manifests/deployment-blue.yaml`
-    - `infra/weather_app_manifests/deployment-green.yaml`  
-   zmień nazwy obrazów na właściwe
+W plikach `infra/weather_app_manifests_blue/deployment-blue.yaml` i `infra/weather_app_manifests_green/deployment-green.yaml` zmień nazwy obrazów na właściwe (użyj tagów z poprzednich kroków).
 
-- wdróż zasoby kubernetes
+Wdróż zasoby kubernetes:
 
-  ```bash
-  kubectl apply -f infra/weather_app_manifests/deployment-blue.yaml
-  kubectl apply -f infra/weather_app_manifests/deployment-green.yaml
-  kubectl apply -f infra/weather_app_manifests/service-blue-green.yaml
-  kubectl apply -f infra/weather_app_manifests/ingress-blue-green.yaml
-  kubectl apply -f infra/weather_app_manifests/service-green-test.yaml
-  ```
+```bash
+kubectl apply -f infra/weather_app_manifests_blue/
+kubectl apply -f infra/weather_app_manifests_green/
+```
 
-- zweryfikuj czy aplikacja jest wdrożona
+Zweryfikuj czy aplikacja jest wdrożona:
 
 ```bash
 kubectl get pods -n weather-app -l version=blue
@@ -312,9 +321,7 @@ Pipeline CI/CD składa się z dwóch oddzielnych workflow:
    - Przyjmuje tag obrazu jako parametr wejściowy
    - Loguje się do Azure i uzyskuje dostęp do klastra AKS
    - Wdraża aplikację na Kubernetes używając określonego obrazu
-   - WerIP
-     - Ingress dla dostępu zewnętrznego
-   - Wdraża aplikację i weryfikuje status wdrożenia
+   - Weryfikuje status wdrożenia
 
 ### Zaawansowane Funkcje
 
@@ -335,9 +342,7 @@ Pipeline CI/CD składa się z dwóch oddzielnych workflow:
    - Weryfikacja statusu wdrożenia z timeoutem
    - Idempotentne tworzenie namespaces i sekretów
 
-## Diagram Workflow
-
-```Kompletny Diagram Przepływu CI/CD
+## Kompletny Diagram Przepływu CI/CD
 
 ```mermaid
 graph TD
@@ -356,7 +361,9 @@ graph TD
     style E fill:#347d39,stroke:#347d39,color:#ffffff
     style F fill:#ffffff,stroke:#30363d
     style G fill:#ffffff,stroke:#30363d
-    style H
+    style H fill:#ff9900,stroke:#ff9900,color:#ffffff
+```
+
 ## Najczęstsze Problemy
 
 1. **Problem z poświadczeniami**: Upewnij się, że Service Principal ma odpowiednie uprawnienia do ACR i AKS.

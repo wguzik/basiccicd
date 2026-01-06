@@ -219,8 +219,6 @@ name: Test Azure Authentication
 
 on:
   workflow_dispatch:  # Ręczne uruchomienie
-  push:
-    branches: [ main ]
 
 permissions:
   id-token: write  # WYMAGANE dla OIDC

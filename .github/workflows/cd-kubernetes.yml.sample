@@ -59,6 +59,7 @@ jobs:
             infra/weather_app_manifests/deployment.yaml
           images: |
             ${{ vars.ACR_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.image-tag.outputs.IMAGE_TAG }}
+          pull-images: false
           
       - name: Verify deployment
         run: |

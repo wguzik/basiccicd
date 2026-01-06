@@ -1,4 +1,4 @@
-name: CD Artifact - weather-app
+name: CD Artifact
 
 on:
   push:
