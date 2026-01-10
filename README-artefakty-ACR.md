@@ -241,10 +241,10 @@ Po zbudowaniu obrazu możesz go użyć w swoich deploymentach:
 az acr login --name $ACR_NAME
 
 # Pobierz obraz
-docker pull ${ACR_LOGIN_SERVER}/weather-app:{TAG}
+docker pull ${ACR_LOGIN_SERVER}/weather-app:${TAG}
 
 # Uruchom kontener
-docker run -p 3000:3000 ${ACR_LOGIN_SERVER}/weather-app:{TAG}
+docker run -p 3000:3000 ${ACR_LOGIN_SERVER}/weather-app:${TAG}
 ```
 
 ### Deployment do Azure Web App
@@ -254,7 +254,7 @@ docker run -p 3000:3000 ${ACR_LOGIN_SERVER}/weather-app:{TAG}
 az webapp config container set \
   --name <webapp-name> \
   --resource-group <resource-group> \
-  --docker-custom-image-name ${ACR_LOGIN_SERVER}/weather-app:{TAG} \
+  --docker-custom-image-name ${ACR_LOGIN_SERVER}/weather-app:${TAG} \
   --docker-registry-server-url https://${ACR_LOGIN_SERVER} \
   --docker-registry-server-user $ACR_USERNAME \
   --docker-registry-server-password $ACR_PASSWORD
@@ -265,7 +265,7 @@ az webapp config container set \
 ```bash
 # AKS może automatycznie pobierać obrazy z ACR w tej samej subskrypcji
 # Zaktualizuj deployment.yaml:
-# image: {ACR_LOGIN_SERVER}/weather-app:{TAG}
+# image: {ACR_LOGIN_SERVER}/weather-app:${TAG}
 
 kubectl apply -f deployment.yaml
 ```
