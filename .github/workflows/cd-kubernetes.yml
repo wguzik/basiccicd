@@ -1,0 +1,66 @@
+name: CD Kubernetes Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Tag obrazu Docker do wdrożenia'
+        required: true
+
+env:
+  APP_NAME: weather-app
+  REGISTRY_NAME: ${{ vars.ACR_NAME }}
+  CLUSTER_NAME: ${{ vars.AZURE_CLUSTER_NAME }}
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-to-kubernetes:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set image tag from input
+        id: image-tag
+        run: echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+        
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          
+      - name: Get AKS credentials
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ env.RESOURCE_GROUP }}
+          cluster-name: ${{ env.CLUSTER_NAME }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+          
+      - name: Deploy to Kubernetes
+        uses: Azure/k8s-deploy@v5
+        with:
+          action: deploy
+          namespace: weather-app
+          manifests: |
+            infra/weather_app_manifests/deployment.yaml
+          images: |
+            ${{ vars.ACR_NAME }}.azurecr.io/${{ env.APP_NAME }}:${{ steps.image-tag.outputs.IMAGE_TAG }}
+          pull-images: false
+          
+      - name: Verify deployment
+        run: |
+          kubectl get pods,svc,ingress -n weather-app
