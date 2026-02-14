@@ -23,4 +23,4 @@ Repozytorium zawiera materiały szkoleniowe dla CI/CD z wykorzystaniem GitHub Ac
 - [Deployment na Web App](./README-deployment-webapp.md) - Slot swaps (~2-3h)
 - [GitOps z Argo CD](./README-gitops.md) - Automated GitOps workflows (~2h)
 
-**Uwaga:** Moduł GitOps (README-gitops.md) jest przeznaczony dla uczestników średnio-zaawansowanych do zaawansowanych.
+**Uwaga:** Moduł GitOps (README-gitops.md) jest przeznaczony dla uczestników średnio-zaawansowanych do zaawansowanych. 
