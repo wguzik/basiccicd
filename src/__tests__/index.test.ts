@@ -104,7 +104,7 @@ describe('Weather App Frontend', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(getByText(container, 'I am tired, boss')).toBeInTheDocument();
+      expect(getByText(container, 'I am tired, boss.')).toBeInTheDocument();
     });
   });
 }); 
