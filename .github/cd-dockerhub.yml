@@ -2,7 +2,7 @@ name: Container image build and push
 
 on:
   push:
-    branches: [ master ]
+    branches: [artifacts-with-dockerhub]
     jobs:
   docker:
     name: Build and Push Docker Image
