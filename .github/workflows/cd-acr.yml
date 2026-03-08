@@ -33,3 +33,15 @@ jobs:
       - name: Login to Azure Container Registry
         run: |
           az acr login --name ${{ vars.ACR_NAME }}
+      - name: Generate image metadata
+        id: meta
+        run: |
+          echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          echo "SHA=$(git rev-parse --short=8 HEAD)" >> $GITHUB_ENV
+
+      - name: Build and push to ACR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ vars.ACR_NAME }}.azurecr.io/${{ vars.IMAGE_NAME }}:${{ env.SHA }}-${{ env.DATE }}
