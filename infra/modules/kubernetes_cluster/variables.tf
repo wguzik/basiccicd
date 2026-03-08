@@ -29,4 +29,4 @@ variable "tags" {
   description = "Tags to be applied to the AKS cluster"
   type        = map(string)
   default     = {}
-} 
+}

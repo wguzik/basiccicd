@@ -5,9 +5,9 @@ resource "azurerm_kubernetes_cluster" "this" {
   dns_prefix          = var.name
 
   default_node_pool {
-    name           = "default"
-    node_count     = var.node_count
-    vm_size        = var.node_size
+    name       = "default"
+    node_count = var.node_count
+    vm_size    = var.node_size
   }
 
   identity {

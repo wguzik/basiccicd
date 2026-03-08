@@ -51,7 +51,7 @@ variable "aks_node_count" {
 variable "aks_node_size" {
   description = "Size of the AKS nodes"
   type        = string
-  default     = "Standard_DS2_v2"
+  default     = "standard_b2s"
 }
 
 variable "nginx_ingress_version" {
