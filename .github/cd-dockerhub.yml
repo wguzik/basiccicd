@@ -2,8 +2,8 @@ name: Container image build and push
 
 on:
   push:
-    branches: [artifacts-with-dockerhub]
-    jobs:
+    branches: [ artifacts-with-dockerhub ]
+jobs:
   docker:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
